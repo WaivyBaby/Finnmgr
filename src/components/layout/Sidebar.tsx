@@ -1,27 +1,31 @@
 'use client'
-
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import {
-  LayoutDashboard,
-  FileText,
-  ArrowLeftRight,
-  Receipt,
-  LogOut,
-  ChevronRight,
-} from 'lucide-react'
+import { useTheme } from 'next-themes'
+import { motion } from 'framer-motion'
 
-const nav = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
-  { href: '/documents', label: 'Documents', icon: FileText },
-  { href: '/invoices', label: 'Invoices', icon: Receipt },
+const NAV = [
+  { href: '/dashboard',     label: 'Dashboard',    icon: '📊' },
+  { href: '/clients',       label: 'Clients',      icon: '👥' },
+  { href: '/invoices',      label: 'Invoices',     icon: '🧾' },
+  { href: '/income',        label: 'Income',       icon: '💰' },
+  { href: '/expenses',      label: 'Expenses',     icon: '🧮' },
+  { href: '/vault',         label: 'Documents',    icon: '📁' },
+  { href: '/budget',        label: 'Budget',       icon: '🎯' },
+  { href: '/cashflow',      label: 'Cash Flow',    icon: '📈' },
+  { href: '/tax',           label: 'Tax',          icon: '📋' },
+  { href: '/reports',       label: 'Reports',      icon: '📉' },
 ]
 
-export default function Sidebar({ userEmail }: { userEmail: string }) {
+const BOTTOM_NAV = [
+  { href: '/settings',      label: 'Settings',     icon: '⚙️' },
+]
+
+export default function Sidebar({ userEmail, userName }: { userEmail: string; userName: string }) {
   const pathname = usePathname()
   const router = useRouter()
+  const { theme, setTheme } = useTheme()
 
   async function signOut() {
     const supabase = createClient()
@@ -30,49 +34,91 @@ export default function Sidebar({ userEmail }: { userEmail: string }) {
     router.refresh()
   }
 
+  const initials = userName ? userName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) : '?'
+
   return (
-    <aside className="w-60 bg-[#0f172a] flex flex-col h-full">
-      <div className="px-5 py-6 border-b border-slate-700/50">
-        <Link href="/dashboard" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center shrink-0">
-            <span className="text-white font-bold text-sm">F</span>
+    <aside className="glass-nav" style={{ width: 220, display: 'flex', flexDirection: 'column', height: '100vh', flexShrink: 0, position: 'relative', zIndex: 10 }}>
+      {/* Logo */}
+      <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid var(--bd)' }}>
+        <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+          <div style={{ width: 32, height: 32, borderRadius: 10, background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ color: 'white', fontWeight: 900, fontSize: 14, fontFamily: 'Cabinet Grotesk, sans-serif' }}>F</span>
           </div>
-          <span className="text-white font-bold text-lg tracking-tight">FINNMGR</span>
+          <span className="nav-brand" style={{ fontSize: 18, fontWeight: 900, color: 'var(--ink)', letterSpacing: '-0.04em' }}>FINNMGR</span>
         </Link>
       </div>
 
-      <nav className="flex-1 px-3 py-4 space-y-0.5">
-        {nav.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(href + '/')
+      {/* Nav */}
+      <nav style={{ flex: 1, padding: '10px 8px', overflowY: 'auto' }}>
+        {NAV.map(({ href, label, icon }) => {
+          const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
           return (
             <Link
               key={href}
               href={href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                active
-                  ? 'bg-indigo-500/20 text-indigo-300'
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-              }`}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '8px 10px', borderRadius: 10, marginBottom: 2,
+                textDecoration: 'none', fontSize: 13, fontWeight: active ? 600 : 500,
+                color: active ? '#6366f1' : 'var(--mu)',
+                background: active ? 'rgba(99,102,241,0.1)' : 'transparent',
+                transition: 'all 0.15s',
+              }}
             >
-              <Icon size={18} />
+              <span style={{ fontSize: 15 }}>{icon}</span>
               {label}
-              {active && <ChevronRight size={14} className="ml-auto opacity-60" />}
+              {active && (
+                <motion.div layoutId="active-pill" style={{ marginLeft: 'auto', width: 6, height: 6, borderRadius: '50%', background: '#6366f1' }} />
+              )}
             </Link>
           )
         })}
       </nav>
 
-      <div className="px-3 py-4 border-t border-slate-700/50">
-        <div className="px-3 py-2 mb-1">
-          <p className="text-xs text-slate-500 truncate">{userEmail}</p>
-        </div>
+      {/* Bottom */}
+      <div style={{ padding: '10px 8px 16px', borderTop: '1px solid var(--bd)' }}>
+        {BOTTOM_NAV.map(({ href, label, icon }) => (
+          <Link
+            key={href}
+            href={href}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '8px 10px', borderRadius: 10, marginBottom: 2,
+              textDecoration: 'none', fontSize: 13, fontWeight: 500,
+              color: 'var(--mu)', transition: 'all 0.15s',
+            }}
+          >
+            <span style={{ fontSize: 15 }}>{icon}</span>
+            {label}
+          </Link>
+        ))}
+
+        {/* Theme toggle */}
         <button
-          onClick={signOut}
-          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-red-400 transition-colors"
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+            padding: '8px 10px', borderRadius: 10, marginBottom: 2,
+            border: 'none', background: 'transparent', cursor: 'pointer',
+            fontSize: 13, fontWeight: 500, color: 'var(--mu)', transition: 'all 0.15s',
+          }}
         >
-          <LogOut size={18} />
-          Sign out
+          <span style={{ fontSize: 15 }}>{theme === 'dark' ? '☀️' : '🌙'}</span>
+          {theme === 'dark' ? 'Light mode' : 'Dark mode'}
         </button>
+
+        {/* User */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', marginTop: 4 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <span style={{ color: 'white', fontSize: 10, fontWeight: 800 }}>{initials}</span>
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userName || userEmail}</p>
+            <button onClick={signOut} style={{ fontSize: 10, color: 'var(--mu)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
+              Sign out
+            </button>
+          </div>
+        </div>
       </div>
     </aside>
   )

@@ -1,54 +1,47 @@
-import Link from "next/link";
+import Link from 'next/link'
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-center px-6">
-      <div className="text-center max-w-2xl">
-        <div className="inline-flex items-center gap-2 mb-8">
-          <div className="w-10 h-10 rounded-xl bg-indigo-500 flex items-center justify-center">
-            <span className="text-white font-bold text-lg">F</span>
+    <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 24px', position: 'relative', zIndex: 1 }}>
+      <div style={{ textAlign: 'center', maxWidth: 640 }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12, marginBottom: 40 }}>
+          <div style={{ width: 48, height: 48, borderRadius: 14, background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ color: 'white', fontFamily: 'Cabinet Grotesk, sans-serif', fontWeight: 900, fontSize: 22 }}>F</span>
           </div>
-          <span className="text-white font-bold text-2xl tracking-tight">FINNMGR</span>
+          <span style={{ fontFamily: 'Cabinet Grotesk, sans-serif', fontWeight: 900, fontSize: 28, letterSpacing: '-0.04em', color: 'var(--ink)' }}>FINNMGR</span>
         </div>
 
-        <h1 className="text-5xl font-bold text-white mb-6 leading-tight">
-          Your finances,<br />
-          <span className="text-indigo-400">finally organized.</span>
+        <h1 style={{ fontFamily: 'Cabinet Grotesk, sans-serif', fontSize: 52, fontWeight: 900, letterSpacing: '-0.04em', color: 'var(--ink)', lineHeight: 1.05, marginBottom: 20 }}>
+          The financial OS for businesses that give a damn.
         </h1>
 
-        <p className="text-slate-400 text-lg mb-10 leading-relaxed">
-          Track income and expenses, manage documents, and create invoices — all in one clean dashboard.
+        <p style={{ fontSize: 17, color: 'var(--mu)', lineHeight: 1.7, marginBottom: 40, maxWidth: 480, margin: '0 auto 40px' }}>
+          Invoicing, expenses, income tracking, tax prep, and cash flow — all in one place. Built for small businesses. Designed to delight.
         </p>
 
-        <div className="flex gap-4 justify-center">
-          <Link
-            href="/auth/signup"
-            className="px-8 py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-semibold rounded-xl transition-colors"
-          >
-            Get started free
+        <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <Link href="/auth/signup" className="btn-primary" style={{ textDecoration: 'none', fontSize: 14, padding: '12px 28px', borderRadius: 12 }}>
+            Get started free →
           </Link>
-          <Link
-            href="/auth/login"
-            className="px-8 py-3 border border-slate-600 hover:border-slate-400 text-slate-300 hover:text-white font-semibold rounded-xl transition-colors"
-          >
+          <Link href="/auth/login" className="btn-ghost" style={{ textDecoration: 'none', fontSize: 14, padding: '12px 28px', borderRadius: 12 }}>
             Sign in
           </Link>
         </div>
 
-        <div className="mt-16 grid grid-cols-3 gap-6 text-left">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginTop: 64 }}>
           {[
-            { icon: "📊", title: "Income & Expenses", desc: "Log transactions and see where your money goes." },
-            { icon: "📄", title: "Document Storage", desc: "Upload and organize receipts, contracts, and more." },
-            { icon: "🧾", title: "Invoices", desc: "Create and send professional invoices in seconds." },
-          ].map((f) => (
-            <div key={f.title} className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
-              <div className="text-2xl mb-3">{f.icon}</div>
-              <div className="text-white font-semibold mb-1">{f.title}</div>
-              <div className="text-slate-400 text-sm">{f.desc}</div>
+            { icon: '🧾', title: 'Smart Invoicing', desc: 'Create and send invoices in seconds. Track who owes you what.' },
+            { icon: '📊', title: 'Income & Expenses', desc: 'Log every transaction. Know your real margins.' },
+            { icon: '🧮', title: 'Tax Ready', desc: 'Quarterly estimates, deductions, and a tax jar that keeps you prepared.' },
+          ].map(f => (
+            <div key={f.title} className="glass-card" style={{ padding: '20px 18px', textAlign: 'left' }}>
+              <span style={{ fontSize: 28, display: 'block', marginBottom: 12 }}>{f.icon}</span>
+              <p style={{ fontFamily: 'Cabinet Grotesk, sans-serif', fontWeight: 800, fontSize: 15, color: 'var(--ink)', marginBottom: 6 }}>{f.title}</p>
+              <p style={{ fontSize: 12, color: 'var(--mu)', lineHeight: 1.6 }}>{f.desc}</p>
             </div>
           ))}
         </div>
       </div>
     </main>
-  );
+  )
 }
