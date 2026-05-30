@@ -86,7 +86,7 @@ export default function TaxPage() {
 
             <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
               <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--bd)' }}>
-                <h2 style={{ fontFamily: 'Cabinet Grotesk, sans-serif', fontSize: 15, fontWeight: 800 }}>Quarterly Estimates {year}</h2>
+                <h2 style={{ fontFamily: 'var(--font-display, Cabinet Grotesk, sans-serif)', fontSize: 15, fontWeight: 800 }}>Quarterly Estimates {year}</h2>
               </div>
               {loading ? <div style={{ padding: 20 }}><div className="skeleton" style={{ height: 200 }} /></div> : estimates.length === 0 ? (
                 <div className="empty-state" style={{ padding: '32px 20px' }}>
@@ -130,7 +130,7 @@ export default function TaxPage() {
 
           {/* Right: Tax Jar */}
           <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-            <h3 style={{ fontFamily: 'Cabinet Grotesk, sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 4 }}>Tax Jar</h3>
+            <h3 style={{ fontFamily: 'var(--font-display, Cabinet Grotesk, sans-serif)', fontSize: 15, fontWeight: 800, marginBottom: 4 }}>Tax Jar</h3>
             <p style={{ fontSize: 12, color: 'var(--mu)', marginBottom: 24 }}>How ready are you?</p>
             <div style={{ position: 'relative', width: 120, height: 120, marginBottom: 20 }}>
               <svg viewBox="0 0 120 120" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>

@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/layout/Sidebar'
+import WaivyWidget from '@/components/accessibility/WaivyWidget'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -15,6 +16,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <main style={{ flex: 1, overflowY: 'auto', paddingTop: 28 }}>
         {children}
       </main>
+      <WaivyWidget />
     </div>
   )
 }

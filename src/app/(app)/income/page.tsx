@@ -74,7 +74,7 @@ export default function IncomePage() {
 
         <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
           <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--bd)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h2 style={{ fontFamily: 'Cabinet Grotesk, sans-serif', fontSize: 15, fontWeight: 800 }}>All Income</h2>
+            <h2 style={{ fontFamily: 'var(--font-display, Cabinet Grotesk, sans-serif)', fontSize: 15, fontWeight: 800 }}>All Income</h2>
           </div>
 
           <AnimatePresence>
@@ -158,7 +158,7 @@ export default function IncomePage() {
                     <td><span className={`status-pill status-${item.status}`}>{item.status}</span></td>
                     <td style={{ textAlign: 'right', paddingRight: 24 }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12 }}>
-                        <span style={{ fontFamily: 'DM Mono, monospace', fontWeight: 600, color: '#10b981' }}>+${Number(item.amount).toFixed(2)}</span>
+                        <span style={{ fontFamily: 'var(--font-mono, DM Mono, monospace)', fontWeight: 600, color: '#10b981' }}>+${Number(item.amount).toFixed(2)}</span>
                         <button onClick={() => remove(item.id)} style={{ opacity: 0, background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 12, padding: '2px 6px', borderRadius: 6 }} className="del-btn">✕</button>
                       </div>
                     </td>

@@ -76,7 +76,7 @@ export default function ClientsPage() {
 
         <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
           <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--bd)' }}>
-            <h2 style={{ fontFamily: 'Cabinet Grotesk, sans-serif', fontSize: 15, fontWeight: 800 }}>All Clients</h2>
+            <h2 style={{ fontFamily: 'var(--font-display, Cabinet Grotesk, sans-serif)', fontSize: 15, fontWeight: 800 }}>All Clients</h2>
           </div>
 
           <AnimatePresence>

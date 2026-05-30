@@ -130,7 +130,7 @@ export default function VaultPage() {
 
         <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
           <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--bd)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h2 style={{ fontFamily: 'Cabinet Grotesk, sans-serif', fontSize: 15, fontWeight: 800 }}>Files <span style={{ color: 'var(--mu)', fontWeight: 400 }}>({filtered.length})</span></h2>
+            <h2 style={{ fontFamily: 'var(--font-display, Cabinet Grotesk, sans-serif)', fontSize: 15, fontWeight: 800 }}>Files <span style={{ color: 'var(--mu)', fontWeight: 400 }}>({filtered.length})</span></h2>
           </div>
 
           {loading ? (

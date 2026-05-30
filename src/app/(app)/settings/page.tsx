@@ -56,7 +56,7 @@ export default function SettingsPage() {
         ) : (
           <form onSubmit={save}>
             <div className="glass-card" style={{ padding: 32, marginBottom: 20 }}>
-              <h2 style={{ fontFamily: 'Cabinet Grotesk, sans-serif', fontSize: 16, fontWeight: 800, marginBottom: 24 }}>Profile & Business</h2>
+              <h2 style={{ fontFamily: 'var(--font-display, Cabinet Grotesk, sans-serif)', fontSize: 16, fontWeight: 800, marginBottom: 24 }}>Profile & Business</h2>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
                 <div>
                   <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--mu)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Email</label>
@@ -85,7 +85,7 @@ export default function SettingsPage() {
         )}
 
         <div className="glass-card" style={{ padding: 32, borderColor: 'rgba(239,68,68,0.2)' }}>
-          <h2 style={{ fontFamily: 'Cabinet Grotesk, sans-serif', fontSize: 16, fontWeight: 800, color: '#ef4444', marginBottom: 8 }}>Danger Zone</h2>
+          <h2 style={{ fontFamily: 'var(--font-display, Cabinet Grotesk, sans-serif)', fontSize: 16, fontWeight: 800, color: '#ef4444', marginBottom: 8 }}>Danger Zone</h2>
           <p style={{ fontSize: 13, color: 'var(--mu)', marginBottom: 16 }}>Your data belongs to you. Always. Download it anytime, no strings attached.</p>
           <button className="btn-ghost" style={{ borderColor: 'rgba(239,68,68,0.3)', color: '#ef4444' }}
             onClick={() => toast('Account deletion coming soon — contact support', { icon: '⚠️' })}>

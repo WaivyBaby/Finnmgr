@@ -42,7 +42,7 @@ export default function Sidebar({ userEmail, userName }: { userEmail: string; us
       <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid var(--bd)' }}>
         <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
           <div style={{ width: 32, height: 32, borderRadius: 10, background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ color: 'white', fontWeight: 900, fontSize: 14, fontFamily: 'Cabinet Grotesk, sans-serif' }}>F</span>
+            <span style={{ color: 'white', fontWeight: 900, fontSize: 14, fontFamily: 'var(--font-display, Cabinet Grotesk, sans-serif)' }}>F</span>
           </div>
           <span className="nav-brand" style={{ fontSize: 18, fontWeight: 900, color: 'var(--ink)', letterSpacing: '-0.04em' }}>FINNMGR</span>
         </Link>

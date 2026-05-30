@@ -100,7 +100,7 @@ export default function BudgetPage() {
 
         <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
           <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--bd)' }}>
-            <h2 style={{ fontFamily: 'Cabinet Grotesk, sans-serif', fontSize: 15, fontWeight: 800 }}>
+            <h2 style={{ fontFamily: 'var(--font-display, Cabinet Grotesk, sans-serif)', fontSize: 15, fontWeight: 800 }}>
               {now.toLocaleString('default', { month: 'long' })} {year} Budget
             </h2>
           </div>

@@ -107,7 +107,7 @@ export default function DashboardPage() {
 
         <motion.div className="glass-card" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4, duration: 0.4 }} style={{ padding: '20px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-            <h2 style={{ fontFamily: 'Cabinet Grotesk, sans-serif', fontSize: 16, fontWeight: 800, color: 'var(--ink)' }}>Recent Activity</h2>
+            <h2 style={{ fontFamily: 'var(--font-display, Cabinet Grotesk, sans-serif)', fontSize: 16, fontWeight: 800, color: 'var(--ink)' }}>Recent Activity</h2>
             <div className="live-dot" />
           </div>
           {recent.length === 0 ? (
@@ -136,7 +136,7 @@ export default function DashboardPage() {
                       </div>
                     </td>
                     <td style={{ color: 'var(--mu)', fontSize: 12 }}>{r.date ? new Date(r.date).toLocaleDateString() : '—'}</td>
-                    <td style={{ textAlign: 'right', fontFamily: 'DM Mono, monospace', fontWeight: 600, color: r.type === 'income' ? '#10b981' : '#ff7043' }}>
+                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono, DM Mono, monospace)', fontWeight: 600, color: r.type === 'income' ? '#10b981' : '#ff7043' }}>
                       {r.type === 'income' ? '+' : '-'}${Number(r.amount).toFixed(2)}
                     </td>
                   </tr>

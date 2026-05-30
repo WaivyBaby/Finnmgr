@@ -86,7 +86,7 @@ export default function CashflowPage() {
         </div>
 
         <div className="glass-card" style={{ padding: '24px' }}>
-          <h2 style={{ fontFamily: 'Cabinet Grotesk, sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 24 }}>Income vs Expenses (6 months)</h2>
+          <h2 style={{ fontFamily: 'var(--font-display, Cabinet Grotesk, sans-serif)', fontSize: 15, fontWeight: 800, marginBottom: 24 }}>Income vs Expenses (6 months)</h2>
           {loading ? (
             <div className="skeleton" style={{ height: 280 }} />
           ) : (
@@ -103,7 +103,7 @@ export default function CashflowPage() {
         </div>
 
         <div className="glass-card" style={{ padding: '24px', marginTop: 16 }}>
-          <h2 style={{ fontFamily: 'Cabinet Grotesk, sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 20 }}>Monthly Net</h2>
+          <h2 style={{ fontFamily: 'var(--font-display, Cabinet Grotesk, sans-serif)', fontSize: 15, fontWeight: 800, marginBottom: 20 }}>Monthly Net</h2>
           {loading ? (
             <div className="skeleton" style={{ height: 200 }} />
           ) : (

@@ -99,7 +99,7 @@ export default function ReportsPage() {
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20, marginBottom: 20 }}>
           {/* Expense breakdown */}
           <div className="glass-card" style={{ padding: 24 }}>
-            <h2 style={{ fontFamily: 'Cabinet Grotesk, sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 20 }}>Expense Breakdown</h2>
+            <h2 style={{ fontFamily: 'var(--font-display, Cabinet Grotesk, sans-serif)', fontSize: 15, fontWeight: 800, marginBottom: 20 }}>Expense Breakdown</h2>
             {loading ? <div className="skeleton" style={{ height: 220 }} /> : expByCat.length === 0 ? (
               <div className="empty-state" style={{ padding: '32px 0' }}><h3>No expenses yet</h3></div>
             ) : (
@@ -119,7 +119,7 @@ export default function ReportsPage() {
                         <div style={{ width: 8, height: 8, borderRadius: '50%', background: COLORS[i % COLORS.length] }} />
                         <span style={{ fontSize: 12, color: 'var(--ink)' }}>{item.name}</span>
                       </div>
-                      <span style={{ fontSize: 12, fontFamily: 'DM Mono, monospace', color: 'var(--mu)' }}>${item.value.toFixed(0)}</span>
+                      <span style={{ fontSize: 12, fontFamily: 'var(--font-mono, DM Mono, monospace)', color: 'var(--mu)' }}>${item.value.toFixed(0)}</span>
                     </div>
                   ))}
                 </div>
@@ -129,7 +129,7 @@ export default function ReportsPage() {
 
           {/* Business Health Score */}
           <div className="glass-card" style={{ padding: 24, textAlign: 'center' }}>
-            <h2 style={{ fontFamily: 'Cabinet Grotesk, sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 4 }}>Health Score</h2>
+            <h2 style={{ fontFamily: 'var(--font-display, Cabinet Grotesk, sans-serif)', fontSize: 15, fontWeight: 800, marginBottom: 4 }}>Health Score</h2>
             <p style={{ fontSize: 11, color: 'var(--mu)', marginBottom: 24 }}>Based on your real data</p>
             <div style={{ position: 'relative', width: 120, height: 120, margin: '0 auto 16px' }}>
               <svg viewBox="0 0 120 120" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
@@ -143,7 +143,7 @@ export default function ReportsPage() {
               </svg>
               <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                 <span style={{ fontSize: 22 }}>{emoji}</span>
-                <span style={{ fontSize: 18, fontWeight: 900, fontFamily: 'Cabinet Grotesk, sans-serif', color }}>{healthScore}</span>
+                <span style={{ fontSize: 18, fontWeight: 900, fontFamily: 'var(--font-display, Cabinet Grotesk, sans-serif)', color }}>{healthScore}</span>
               </div>
             </div>
             <p style={{ fontWeight: 700, color, fontSize: 14 }}>{label}</p>
@@ -153,7 +153,7 @@ export default function ReportsPage() {
         {/* Income by category */}
         {incByCat.length > 0 && (
           <div className="glass-card" style={{ padding: 24 }}>
-            <h2 style={{ fontFamily: 'Cabinet Grotesk, sans-serif', fontSize: 15, fontWeight: 800, marginBottom: 20 }}>Income by Category</h2>
+            <h2 style={{ fontFamily: 'var(--font-display, Cabinet Grotesk, sans-serif)', fontSize: 15, fontWeight: 800, marginBottom: 20 }}>Income by Category</h2>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={incByCat} layout="vertical">
                 <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--mu)' }} tickFormatter={v => `$${v}`} />
