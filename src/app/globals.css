@@ -1,6 +1,6 @@
 /* ── FONTS ── */
 @import url('https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@700,800,900&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=Lexend:wght@400;500;600&display=swap');
 
 @import "tailwindcss";
 
@@ -320,4 +320,120 @@ h1, h2, h3, h4, h5, h6,
 
 @media (max-width: 768px) {
   .page-content { padding: 0 16px 80px; }
+}
+
+/* ══════════════════════════════════════════
+   TASK 2 — ACCESSIBILITY CLASSES (WaivyWidget)
+   ══════════════════════════════════════════ */
+
+/* Font size steppers */
+html.a11y-font-70 body { font-size: 70% !important; }
+html.a11y-font-80 body { font-size: 80% !important; }
+html.a11y-font-90 body { font-size: 90% !important; }
+html.a11y-font-110 body { font-size: 110% !important; }
+html.a11y-font-120 body { font-size: 120% !important; }
+html.a11y-font-130 body { font-size: 130% !important; }
+html.a11y-font-140 body { font-size: 140% !important; }
+html.a11y-font-150 body { font-size: 150% !important; }
+html.a11y-font-160 body { font-size: 160% !important; }
+html.a11y-font-170 body { font-size: 170% !important; }
+html.a11y-font-180 body { font-size: 180% !important; }
+html.a11y-font-190 body { font-size: 190% !important; }
+html.a11y-font-200 body { font-size: 200% !important; }
+
+/* Text spacing */
+html.a11y-line-height body,
+html.a11y-line-height body p,
+html.a11y-line-height body div,
+html.a11y-line-height body span { line-height: 2.0 !important; }
+
+html.a11y-letter-spacing body * { letter-spacing: 0.08em !important; }
+html.a11y-word-spacing body * { word-spacing: 0.25em !important; }
+
+/* Dyslexia font */
+html.a11y-dyslexia body *:not(h1):not(h2):not(h3):not(h4):not(h5) {
+  font-family: Lexend, sans-serif !important;
+}
+
+/* Text alignment */
+html.a11y-align-left body * { text-align: left !important; }
+html.a11y-align-center body * { text-align: center !important; }
+html.a11y-align-right body * { text-align: right !important; }
+
+/* Contrast & Visual */
+html.a11y-high-contrast { filter: contrast(1.6) !important; }
+html.a11y-monochrome { filter: grayscale(100%) !important; }
+html.a11y-invert { filter: invert(1) hue-rotate(180deg) !important; }
+html.a11y-sat-low { filter: saturate(0.3) !important; }
+html.a11y-sat-high { filter: saturate(2) !important; }
+
+html.a11y-highlight-links a,
+html.a11y-highlight-links button {
+  outline: 2.5px solid #f59e0b !important;
+  text-decoration: underline !important;
+}
+
+html.a11y-highlight-headings h1,
+html.a11y-highlight-headings h2,
+html.a11y-highlight-headings h3,
+html.a11y-highlight-headings h4 {
+  border-left: 4px solid #6366f1 !important;
+  padding-left: 10px !important;
+  background: rgba(99,102,241,0.06) !important;
+}
+
+html.a11y-hide-images .jitter-mesh,
+html.a11y-hide-images .orb,
+html.a11y-hide-images .noise { display: none !important; }
+
+/* Navigation */
+html.a11y-cursor-large * { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Ccircle cx='8' cy='8' r='6' fill='%236366f1'/%3E%3C/svg%3E") 8 8, auto !important; }
+
+html.a11y-focus-strong *:focus {
+  outline: 3px solid #6366f1 !important;
+  box-shadow: 0 0 0 6px rgba(99,102,241,0.2) !important;
+}
+
+/* Cognitive */
+html.a11y-reduced-motion *,
+html.a11y-reduced-motion *::before,
+html.a11y-reduced-motion *::after {
+  animation-duration: 0.001ms !important;
+  transition-duration: 0.001ms !important;
+}
+
+html.a11y-pause-anim * { animation-play-state: paused !important; }
+
+/* Reading guide elements */
+.reading-guide-line {
+  position: fixed; left: 0; right: 0;
+  height: 3px; background: rgba(99,102,241,0.5);
+  pointer-events: none; z-index: 8999; display: none;
+}
+.reading-guide-mask-top,
+.reading-guide-mask-bottom {
+  position: fixed; left: 0; right: 0;
+  background: rgba(0,0,0,0.15);
+  pointer-events: none; z-index: 8998; display: none;
+}
+html.a11y-reading-guide .reading-guide-line,
+html.a11y-reading-guide .reading-guide-mask-top,
+html.a11y-reading-guide .reading-guide-mask-bottom { display: block; }
+
+/* Skip nav link */
+.a11y-skip-link {
+  position: fixed; top: -100px; left: 50%;
+  transform: translateX(-50%);
+  background: #6366f1; color: #fff;
+  padding: 10px 24px; border-radius: 8px;
+  font-weight: 700; font-size: 14px;
+  z-index: 10000; text-decoration: none;
+  transition: top 0.2s;
+}
+.a11y-skip-link:focus { top: 12px; }
+
+/* Wavy pulse keyframe */
+@keyframes wavy-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(99,102,241,0.5); }
+  50% { box-shadow: 0 0 0 10px rgba(99,102,241,0); }
 }
