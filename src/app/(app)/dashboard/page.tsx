@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import CountUp from 'react-countup'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -9,6 +9,10 @@ import {
   Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from 'recharts'
 import toast from 'react-hot-toast'
+import {
+  IncomeModal, ExpenseModal, InvoiceModal, ClientModal, DocumentModal, BudgetModal,
+  type ModalClient,
+} from '@/components/modals/FinnMgrModals'
 
 /* ── Static demo data ─────────────────────────────────────────────────────── */
 const DEMO = {
@@ -92,31 +96,6 @@ function ChartTip({ active, payload, label }: { active?: boolean; payload?: { na
   )
 }
 
-/* ── Modal shell ─────────────────────────────────────────────────────────── */
-function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', h)
-    return () => document.removeEventListener('keydown', h)
-  }, [onClose])
-  return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      onClick={onClose}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)', zIndex: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <motion.div initial={{ opacity: 0, scale: 0.93, y: 24 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.93 }}
-        transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
-        onClick={e => e.stopPropagation()}
-        style={{ background: 'var(--bg2)', border: '1px solid var(--bd2)', borderRadius: 20, width: '100%', maxWidth: 460, boxShadow: '0 30px 90px rgba(0,0,0,0.5)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px 16px', borderBottom: '1px solid var(--bd)' }}>
-          <h3 style={{ fontWeight: 900, fontSize: 17, color: 'var(--ink)', letterSpacing: '-0.03em' }}>{title}</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--mu)', fontSize: 22, lineHeight: 1, borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
-        </div>
-        <div style={{ padding: 24 }}>{children}</div>
-      </motion.div>
-    </motion.div>
-  )
-}
-
 /* ── Learn panel ─────────────────────────────────────────────────────────── */
 function LearnPanel({ topic, onClose }: { topic: LearnTopic; onClose: () => void }) {
   const content = topic ? LEARN_CONTENT[topic] : null
@@ -151,18 +130,6 @@ function LearnPanel({ topic, onClose }: { topic: LearnTopic; onClose: () => void
   )
 }
 
-/* ── Field helper ────────────────────────────────────────────────────────── */
-const iStyle: React.CSSProperties = { width: '100%', padding: '9px 14px', background: 'var(--in-bg)', border: '1.5px solid var(--in-bd)', borderRadius: 10, fontSize: 13, color: 'var(--in-txt)', outline: 'none', fontFamily: 'inherit', marginTop: 6 }
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div style={{ marginBottom: 14 }}>
-      <label style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--mu)' }}>{label}</label>
-      {children}
-    </div>
-  )
-}
-
 /* ══════════════════════════════════════════════════════════════════════════
    MAIN DASHBOARD
 ══════════════════════════════════════════════════════════════════════════ */
@@ -170,6 +137,7 @@ export default function DashboardPage() {
   const [userId, setUserId] = useState('')
   const [userName, setUserName] = useState('there')
   const [loading, setLoading] = useState(true)
+  const [clients, setClients] = useState<ModalClient[]>([])
 
   // UI state
   const [modal, setModal] = useState<Modal>(null)
@@ -180,29 +148,22 @@ export default function DashboardPage() {
   const [affordAmt, setAffordAmt] = useState('')
   const [confetti, setConfetti] = useState(false)
   const [checklist, setChecklist] = useState<boolean[]>(Array(7).fill(false))
-  const [saving, setSaving] = useState(false)
   const [cmdOpen, setCmdOpen] = useState(false)
   const [cmdQuery, setCmdQuery] = useState('')
   const [cmdIdx, setCmdIdx] = useState(0)
 
-  // Form state
-  const [incF, setIncF] = useState({ client_name: '', amount: '', category: 'Design', date: '' })
-  const [expF, setExpF] = useState({ vendor: '', amount: '', category: 'Operations', date: '' })
-  const [invF, setInvF] = useState({ client_name: '', client_email: '', amount: '', due_date: '' })
-  const [cliF, setCliF] = useState({ name: '', email: '', company: '' })
-  const [docF, setDocF] = useState({ name: '', category: 'Contracts' })
-  const [budF, setBudF] = useState({ name: '', monthly_limit: '', icon: '💼' })
+  // (form state now lives inside shared modal components)
 
   /* Load user */
   useEffect(() => {
-    const today = new Date().toISOString().split('T')[0]
-    setIncF(f => ({ ...f, date: today }))
-    setExpF(f => ({ ...f, date: today }))
     const sb = createClient()
-    sb.auth.getUser().then(({ data: { user } }) => {
+    sb.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return
       setUserId(user.id)
       setUserName(user.user_metadata?.full_name?.split(' ')[0] ?? 'there')
+      // Load clients for autofill in invoice/income modals
+      const { data: cData } = await sb.from('clients').select('id,name,email,payment_terms,address,company').eq('user_id', user.id)
+      setClients((cData ?? []) as ModalClient[])
     }).finally(() => setLoading(false))
     // Load checklist
     try { const s = localStorage.getItem(CHECKLIST_KEY); if (s) setChecklist(JSON.parse(s)) } catch {}
@@ -278,55 +239,7 @@ export default function DashboardPage() {
     return () => document.removeEventListener('keydown', h)
   }, [cmdOpen, cmdIdx, filteredCmds])
 
-  /* Save helpers */
-  async function saveIncome(e: React.FormEvent) {
-    e.preventDefault(); setSaving(true)
-    const sb = createClient()
-    const { error } = await sb.from('income').insert({ user_id: userId, ...incF, amount: parseFloat(incF.amount) })
-    setSaving(false)
-    if (error) { toast.error('Failed to save'); return }
-    toast.success('Income added ✓'); setModal(null)
-    setIncF({ client_name: '', amount: '', category: 'Design', date: new Date().toISOString().split('T')[0] })
-  }
-
-  async function saveExpense(e: React.FormEvent) {
-    e.preventDefault(); setSaving(true)
-    const sb = createClient()
-    const { error } = await sb.from('expenses').insert({ user_id: userId, ...expF, amount: parseFloat(expF.amount) })
-    setSaving(false)
-    if (error) { toast.error('Failed to save'); return }
-    toast.success('Expense added ✓'); setModal(null)
-    setExpF({ vendor: '', amount: '', category: 'Operations', date: new Date().toISOString().split('T')[0] })
-  }
-
-  async function saveInvoice(e: React.FormEvent) {
-    e.preventDefault(); setSaving(true)
-    const sb = createClient()
-    const total = parseFloat(invF.amount)
-    const num = `INV-${Date.now().toString().slice(-6)}`
-    const { error } = await sb.from('invoices').insert({ user_id: userId, invoice_number: num, client_name: invF.client_name, client_email: invF.client_email, due_date: invF.due_date, total, balance_due: total, line_items: [{ description: 'Services', quantity: 1, rate: total, amount: total }] })
-    setSaving(false)
-    if (error) { toast.error('Failed to create invoice'); return }
-    toast.success('Invoice created! 🧾'); setModal(null)
-  }
-
-  async function saveClient(e: React.FormEvent) {
-    e.preventDefault(); setSaving(true)
-    const sb = createClient()
-    const { error } = await sb.from('clients').insert({ user_id: userId, ...cliF })
-    setSaving(false)
-    if (error) { toast.error('Failed to add client'); return }
-    toast.success('Client added ✓'); setModal(null)
-  }
-
-  async function saveBudget(e: React.FormEvent) {
-    e.preventDefault(); setSaving(true)
-    const sb = createClient()
-    const { error } = await sb.from('budget_categories').insert({ user_id: userId, name: budF.name, icon: budF.icon, monthly_limit: parseFloat(budF.monthly_limit), sort_order: 0 })
-    setSaving(false)
-    if (error) { toast.error('Failed to save budget'); return }
-    toast.success('Budget category added ✓'); setModal(null)
-  }
+  // (save logic now lives inside shared modal components)
 
   /* KPI cards */
   const KPI_CARDS = [
@@ -524,7 +437,7 @@ export default function DashboardPage() {
             <div style={{ position: 'relative', marginBottom: 10 }}>
               <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--mu)', fontSize: 14 }}>$</span>
               <input type="number" min="0" value={affordAmt} onChange={e => setAffordAmt(e.target.value)} placeholder="Enter amount"
-                style={{ ...iStyle, paddingLeft: 28, marginTop: 0 }} />
+                style={{ width: '100%', padding: '9px 14px', paddingLeft: 28, background: 'var(--in-bg)', border: '1.5px solid var(--in-bd)', borderRadius: 10, fontSize: 13, color: 'var(--in-txt)', outline: 'none', fontFamily: 'inherit' }} />
             </div>
             <div style={{ display: 'flex', gap: 5, marginBottom: 12, flexWrap: 'wrap' }}>
               {[500, 2000, 5000, 10000].map(v => (
@@ -694,113 +607,14 @@ export default function DashboardPage() {
         </motion.div>
       </motion.div>
 
-      {/* ══ Modals ══ */}
+      {/* ══ Modals — defined once in FinnMgrModals, imported here ══ */}
       <AnimatePresence>
-        {modal === 'income' && (
-          <ModalShell title="Add Income" onClose={() => setModal(null)}>
-            <form onSubmit={saveIncome}>
-              <Field label="Client / Source"><input style={iStyle} required placeholder="Acme Corp" value={incF.client_name} onChange={e => setIncF(f => ({ ...f, client_name: e.target.value }))} /></Field>
-              <Field label="Amount ($)"><input style={iStyle} type="number" min="0" step="0.01" required placeholder="0.00" value={incF.amount} onChange={e => setIncF(f => ({ ...f, amount: e.target.value }))} /></Field>
-              <Field label="Category">
-                <select style={iStyle} value={incF.category} onChange={e => setIncF(f => ({ ...f, category: e.target.value }))}>
-                  {['Design','Development','Consulting','Retainer','Coaching','Writing','Marketing','Other'].map(c => <option key={c}>{c}</option>)}
-                </select>
-              </Field>
-              <Field label="Date"><input style={iStyle} type="date" required value={incF.date} onChange={e => setIncF(f => ({ ...f, date: e.target.value }))} /></Field>
-              <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
-                <button type="submit" disabled={saving} className="btn-primary" style={{ flex: 1, justifyContent: 'center', padding: 12 }}>{saving ? 'Saving...' : 'Add Income 💰'}</button>
-                <button type="button" className="btn-ghost" onClick={() => setModal(null)} style={{ padding: '12px 20px' }}>Cancel</button>
-              </div>
-            </form>
-          </ModalShell>
-        )}
-        {modal === 'expense' && (
-          <ModalShell title="Add Expense" onClose={() => setModal(null)}>
-            <form onSubmit={saveExpense}>
-              <Field label="Vendor"><input style={iStyle} required placeholder="Adobe, AWS, etc." value={expF.vendor} onChange={e => setExpF(f => ({ ...f, vendor: e.target.value }))} /></Field>
-              <Field label="Amount ($)"><input style={iStyle} type="number" min="0" step="0.01" required placeholder="0.00" value={expF.amount} onChange={e => setExpF(f => ({ ...f, amount: e.target.value }))} /></Field>
-              <Field label="Category">
-                <select style={iStyle} value={expF.category} onChange={e => setExpF(f => ({ ...f, category: e.target.value }))}>
-                  {['Operations','Software','Marketing','Payroll','Travel','Meals','Equipment','Professional Services','Other'].map(c => <option key={c}>{c}</option>)}
-                </select>
-              </Field>
-              <Field label="Date"><input style={iStyle} type="date" required value={expF.date} onChange={e => setExpF(f => ({ ...f, date: e.target.value }))} /></Field>
-              <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
-                <button type="submit" disabled={saving} className="btn-primary" style={{ flex: 1, justifyContent: 'center', padding: 12, background: 'linear-gradient(135deg, #ff7043, #f59e0b)' }}>{saving ? 'Saving...' : 'Add Expense 🧮'}</button>
-                <button type="button" className="btn-ghost" onClick={() => setModal(null)} style={{ padding: '12px 20px' }}>Cancel</button>
-              </div>
-            </form>
-          </ModalShell>
-        )}
-        {modal === 'invoice' && (
-          <ModalShell title="Create Invoice" onClose={() => setModal(null)}>
-            <form onSubmit={saveInvoice}>
-              <Field label="Client Name"><input style={iStyle} required placeholder="Acme Corp" value={invF.client_name} onChange={e => setInvF(f => ({ ...f, client_name: e.target.value }))} /></Field>
-              <Field label="Client Email"><input style={iStyle} type="email" placeholder="client@example.com" value={invF.client_email} onChange={e => setInvF(f => ({ ...f, client_email: e.target.value }))} /></Field>
-              <Field label="Amount ($)"><input style={iStyle} type="number" min="0" step="0.01" required placeholder="0.00" value={invF.amount} onChange={e => setInvF(f => ({ ...f, amount: e.target.value }))} /></Field>
-              <Field label="Due Date"><input style={iStyle} type="date" required value={invF.due_date} onChange={e => setInvF(f => ({ ...f, due_date: e.target.value }))} /></Field>
-              <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
-                <button type="submit" disabled={saving} className="btn-primary" style={{ flex: 1, justifyContent: 'center', padding: 12 }}>{saving ? 'Creating...' : 'Create Invoice 🧾'}</button>
-                <button type="button" className="btn-ghost" onClick={() => setModal(null)} style={{ padding: '12px 20px' }}>Cancel</button>
-              </div>
-            </form>
-          </ModalShell>
-        )}
-        {modal === 'client' && (
-          <ModalShell title="Add Client" onClose={() => setModal(null)}>
-            <form onSubmit={saveClient}>
-              <Field label="Full Name"><input style={iStyle} required placeholder="Jane Smith" value={cliF.name} onChange={e => setCliF(f => ({ ...f, name: e.target.value }))} /></Field>
-              <Field label="Company"><input style={iStyle} placeholder="Acme Corp" value={cliF.company} onChange={e => setCliF(f => ({ ...f, company: e.target.value }))} /></Field>
-              <Field label="Email"><input style={iStyle} type="email" placeholder="jane@example.com" value={cliF.email} onChange={e => setCliF(f => ({ ...f, email: e.target.value }))} /></Field>
-              <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
-                <button type="submit" disabled={saving} className="btn-primary" style={{ flex: 1, justifyContent: 'center', padding: 12, background: 'linear-gradient(135deg, #0ea5e9, #6366f1)' }}>{saving ? 'Adding...' : 'Add Client 👥'}</button>
-                <button type="button" className="btn-ghost" onClick={() => setModal(null)} style={{ padding: '12px 20px' }}>Cancel</button>
-              </div>
-            </form>
-          </ModalShell>
-        )}
-        {modal === 'document' && (
-          <ModalShell title="Upload Document" onClose={() => setModal(null)}>
-            <Field label="Document Name"><input style={iStyle} required placeholder="Q2 Contract.pdf" value={docF.name} onChange={e => setDocF(f => ({ ...f, name: e.target.value }))} /></Field>
-            <Field label="Category">
-              <select style={iStyle} value={docF.category} onChange={e => setDocF(f => ({ ...f, category: e.target.value }))}>
-                {['Contracts','Invoices','Tax Docs','Bank Statements','Receipts','Reports','Other'].map(c => <option key={c}>{c}</option>)}
-              </select>
-            </Field>
-            <div style={{ border: '2px dashed var(--bd2)', borderRadius: 12, padding: '24px', textAlign: 'center', marginBottom: 16, cursor: 'pointer', background: 'var(--bg3)' }}
-              onClick={() => toast('Head to Document Vault for full upload 📁')}>
-              <p style={{ fontSize: 24, marginBottom: 8 }}>📁</p>
-              <p style={{ fontSize: 12, color: 'var(--mu)' }}>Click to select file or drag & drop</p>
-              <p style={{ fontSize: 10, color: 'var(--mu2)', marginTop: 4 }}>Full upload available in Document Vault</p>
-            </div>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button className="btn-primary" style={{ flex: 1, justifyContent: 'center', padding: 12 }} onClick={() => { toast.success('Go to Document Vault for full upload!'); setModal(null) }}>Go to Vault 📁</button>
-              <button className="btn-ghost" onClick={() => setModal(null)} style={{ padding: '12px 20px' }}>Cancel</button>
-            </div>
-          </ModalShell>
-        )}
-        {modal === 'budget' && (
-          <ModalShell title="Add Budget Category" onClose={() => setModal(null)}>
-            <form onSubmit={saveBudget}>
-              <Field label="Category Name"><input style={iStyle} required placeholder="Software subscriptions" value={budF.name} onChange={e => setBudF(f => ({ ...f, name: e.target.value }))} /></Field>
-              <Field label="Monthly Limit ($)"><input style={iStyle} type="number" min="0" step="0.01" required placeholder="500.00" value={budF.monthly_limit} onChange={e => setBudF(f => ({ ...f, monthly_limit: e.target.value }))} /></Field>
-              <Field label="Icon">
-                <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
-                  {['💼','💻','📱','✈️','🍽️','🏥','📚','🎯','🛒','⚡'].map(ic => (
-                    <button key={ic} type="button" onClick={() => setBudF(f => ({ ...f, icon: ic }))}
-                      style={{ width: 36, height: 36, borderRadius: 8, border: budF.icon === ic ? '2px solid #6366f1' : '1px solid var(--bd2)', background: budF.icon === ic ? 'rgba(99,102,241,0.1)' : 'var(--bg3)', cursor: 'pointer', fontSize: 18 }}>
-                      {ic}
-                    </button>
-                  ))}
-                </div>
-              </Field>
-              <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
-                <button type="submit" disabled={saving} className="btn-primary" style={{ flex: 1, justifyContent: 'center', padding: 12 }}>{saving ? 'Saving...' : 'Add Category 🎯'}</button>
-                <button type="button" className="btn-ghost" onClick={() => setModal(null)} style={{ padding: '12px 20px' }}>Cancel</button>
-              </div>
-            </form>
-          </ModalShell>
-        )}
+        {modal === 'income' && <IncomeModal userId={userId} clients={clients} onClose={() => setModal(null)} />}
+        {modal === 'expense' && <ExpenseModal userId={userId} onClose={() => setModal(null)} />}
+        {modal === 'invoice' && <InvoiceModal userId={userId} clients={clients} onClose={() => setModal(null)} />}
+        {modal === 'client' && <ClientModal userId={userId} onClose={() => setModal(null)} onSuccess={() => { /* refresh clients */ const sb = createClient(); sb.from('clients').select('id,name,email,payment_terms,address,company').eq('user_id', userId).then(({ data }) => { if (data) setClients(data as ModalClient[]) }) }} />}
+        {modal === 'document' && <DocumentModal userId={userId} onClose={() => setModal(null)} />}
+        {modal === 'budget' && <BudgetModal userId={userId} onClose={() => setModal(null)} />}
       </AnimatePresence>
 
       {/* ══ Command Palette ══ */}
