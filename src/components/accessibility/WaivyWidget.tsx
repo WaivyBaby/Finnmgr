@@ -254,12 +254,24 @@ export default function WaivyWidget() {
   if (!mounted) return null
   const activeCount = countActive(state)
 
-  const panelStyle: React.CSSProperties = {
+  // Detect mobile (JS-side, after mount)
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+
+  const panelStyle: React.CSSProperties = isMobile ? {
+    position: 'fixed', bottom: 0, left: 0, right: 0,
+    background: 'var(--bg2)', border: '1px solid var(--bd2)',
+    borderRadius: '18px 18px 0 0', boxShadow: '0 -10px 60px rgba(0,0,0,0.4)',
+    zIndex: 9001, overflow: 'hidden', maxHeight: '80vh', display: 'flex', flexDirection: 'column',
+  } : {
     position: 'fixed', bottom: 84, left: 24, width: 300,
     background: 'var(--bg2)', border: '1px solid var(--bd2)',
     borderRadius: 18, boxShadow: '0 20px 70px rgba(0,0,0,0.4)',
     zIndex: 9001, overflow: 'hidden', maxHeight: '80vh', display: 'flex', flexDirection: 'column',
   }
+
+  const mobilePanelAnim = isMobile
+    ? { initial: { y: '100%' }, animate: { y: 0 }, exit: { y: '100%' } }
+    : { initial: { opacity: 0, x: -20, scale: 0.95 }, animate: { opacity: 1, x: 0, scale: 1 }, exit: { opacity: 0, x: -20, scale: 0.95 } }
 
   return (
     <>
@@ -281,10 +293,13 @@ export default function WaivyWidget() {
         onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)' }}
       >
         ♿
+        {/* White dot badge when ANY feature active */}
         {activeCount > 0 && (
-          <span style={{ position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: '50%', background: '#f59e0b', color: '#000', fontSize: 9, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {activeCount}
-          </span>
+          <span style={{
+            position: 'absolute', top: 6, right: 6,
+            width: 8, height: 8, borderRadius: '50%',
+            background: '#fff', boxShadow: '0 0 0 2px rgba(99,102,241,0.5)',
+          }} />
         )}
       </button>
 
@@ -294,7 +309,7 @@ export default function WaivyWidget() {
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 8999 }} />
             <motion.div
-              initial={{ opacity: 0, x: -20, scale: 0.95 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={{ opacity: 0, x: -20, scale: 0.95 }}
+              {...mobilePanelAnim}
               transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
               style={panelStyle}
             >
@@ -307,7 +322,7 @@ export default function WaivyWidget() {
                   </p>
                 </div>
                 {activeCount > 0 && (
-                  <button onClick={reset} style={{ fontSize: 10, color: '#6366f1', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: 6, background2: 'rgba(99,102,241,0.08)' } as React.CSSProperties}>
+                  <button onClick={reset} style={{ fontSize: 10, color: '#6366f1', fontWeight: 700, background: 'rgba(99,102,241,0.08)', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: 6 }}>
                     Reset all
                   </button>
                 )}
@@ -332,11 +347,17 @@ export default function WaivyWidget() {
                         +
                       </button>
                     </div>
-                    <div style={{ marginTop: 8, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                      {[70, 100, 130, 160, 200].map(p => (
-                        <button key={p} onClick={() => update({ fontSize: p })}
-                          style={{ padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, border: 'none', cursor: 'pointer', background: state.fontSize === p ? '#6366f1' : 'var(--bg3)', color: state.fontSize === p ? '#fff' : 'var(--mu)' }}>
-                          {p}%
+                    {/* Named presets */}
+                    <div style={{ marginTop: 10, display: 'flex', gap: 5 }}>
+                      {([
+                        { label: 'Small', size: 90 },
+                        { label: 'Default', size: 100 },
+                        { label: 'Large', size: 120 },
+                        { label: 'XL', size: 140 },
+                      ] as const).map(p => (
+                        <button key={p.label} onClick={() => update({ fontSize: p.size })}
+                          style={{ flex: 1, padding: '6px 4px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700, transition: 'all 0.15s', background: state.fontSize === p.size ? '#6366f1' : 'var(--bg3)', color: state.fontSize === p.size ? '#fff' : 'var(--mu)' }}>
+                          {p.label}
                         </button>
                       ))}
                     </div>

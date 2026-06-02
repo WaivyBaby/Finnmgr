@@ -322,24 +322,30 @@ h1, h2, h3, h4, h5, h6,
   .page-content { padding: 0 16px 80px; }
 }
 
+/* ── Cards adapt to larger text (Task 6) ── */
+.stat-card, .glass-card, .gcard {
+  height: auto !important;
+  min-height: fit-content;
+}
+
 /* ══════════════════════════════════════════
-   TASK 2 — ACCESSIBILITY CLASSES (WaivyWidget)
+   ACCESSIBILITY CLASSES (WaivyWidget)
    ══════════════════════════════════════════ */
 
-/* Font size steppers */
-html.a11y-font-70 body { font-size: 70% !important; }
-html.a11y-font-80 body { font-size: 80% !important; }
-html.a11y-font-90 body { font-size: 90% !important; }
-html.a11y-font-110 body { font-size: 110% !important; }
-html.a11y-font-120 body { font-size: 120% !important; }
-html.a11y-font-130 body { font-size: 130% !important; }
-html.a11y-font-140 body { font-size: 140% !important; }
-html.a11y-font-150 body { font-size: 150% !important; }
-html.a11y-font-160 body { font-size: 160% !important; }
-html.a11y-font-170 body { font-size: 170% !important; }
-html.a11y-font-180 body { font-size: 180% !important; }
-html.a11y-font-190 body { font-size: 190% !important; }
-html.a11y-font-200 body { font-size: 200% !important; }
+/* Font size steppers — target html element so rem units scale */
+html.a11y-font-70 { font-size: 70% !important; }
+html.a11y-font-80 { font-size: 80% !important; }
+html.a11y-font-90 { font-size: 90% !important; }
+html.a11y-font-110 { font-size: 110% !important; }
+html.a11y-font-120 { font-size: 120% !important; }
+html.a11y-font-130 { font-size: 130% !important; }
+html.a11y-font-140 { font-size: 140% !important; }
+html.a11y-font-150 { font-size: 150% !important; }
+html.a11y-font-160 { font-size: 160% !important; }
+html.a11y-font-170 { font-size: 170% !important; }
+html.a11y-font-180 { font-size: 180% !important; }
+html.a11y-font-190 { font-size: 190% !important; }
+html.a11y-font-200 { font-size: 200% !important; }
 
 /* Text spacing */
 html.a11y-line-height body,
@@ -368,8 +374,10 @@ html.a11y-sat-low { filter: saturate(0.3) !important; }
 html.a11y-sat-high { filter: saturate(2) !important; }
 
 html.a11y-highlight-links a,
-html.a11y-highlight-links button {
+html.a11y-highlight-links button,
+html.a11y-highlight-links [role="button"] {
   outline: 2.5px solid #f59e0b !important;
+  outline-offset: 2px !important;
   text-decoration: underline !important;
 }
 
@@ -384,13 +392,15 @@ html.a11y-highlight-headings h4 {
 
 html.a11y-hide-images .jitter-mesh,
 html.a11y-hide-images .orb,
-html.a11y-hide-images .noise { display: none !important; }
+html.a11y-hide-images .noise,
+html.a11y-hide-images .mesh-bg { display: none !important; }
 
 /* Navigation */
 html.a11y-cursor-large * { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Ccircle cx='8' cy='8' r='6' fill='%236366f1'/%3E%3C/svg%3E") 8 8, auto !important; }
 
 html.a11y-focus-strong *:focus {
   outline: 3px solid #6366f1 !important;
+  outline-offset: 3px !important;
   box-shadow: 0 0 0 6px rgba(99,102,241,0.2) !important;
 }
 
