@@ -447,3 +447,160 @@ html.a11y-reading-guide .reading-guide-mask-bottom { display: block; }
   0%, 100% { box-shadow: 0 0 0 0 rgba(99,102,241,0.5); }
   50% { box-shadow: 0 0 0 10px rgba(99,102,241,0); }
 }
+
+/* ══════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE — PHASE 1: NAVIGATION
+   ══════════════════════════════════════════════════════════ */
+
+/* Tablet/desktop-only sidebar label elements — hidden on tablet via scoped rules below */
+.nav-tooltip { display: none !important; }
+.mobile-header { display: none; }
+
+@media (max-width: 767px) {
+  /* Hide desktop sidebar entirely */
+  .desktop-sidebar { display: none !important; }
+
+  /* Main content clears the fixed 56px mobile header */
+  main { padding-top: 72px !important; }
+
+  /* Prevent horizontal overflow on all pages */
+  .page-content { overflow-x: hidden; }
+
+  /* Mobile header bar */
+  .mobile-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 56px;
+    padding: 0 16px;
+    background: var(--glass);
+    backdrop-filter: blur(28px);
+    -webkit-backdrop-filter: blur(28px);
+    border-bottom: 1px solid var(--glass-bd);
+    z-index: 100;
+  }
+
+  /* Mobile drawer nav links */
+  .mobile-nav-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 52px;
+    font-size: 15px;
+    font-weight: 500;
+    padding: 0 20px;
+    border-radius: 10px;
+    text-decoration: none;
+    color: var(--mu);
+    transition: background 0.15s, color 0.15s;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    width: 100%;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+  .mobile-nav-link.active {
+    color: #6366f1;
+    background: rgba(99,102,241,0.1);
+    font-weight: 600;
+  }
+  .mobile-nav-link:hover { background: var(--bg3); color: var(--ink); }
+}
+
+/* ── Tablet sidebar — icons-only with tooltip (768–1023px) ── */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .desktop-sidebar { width: 64px !important; min-width: 64px; }
+  .desktop-sidebar .nav-label { display: none !important; }
+  .desktop-sidebar .nav-brand { display: none !important; }
+  .desktop-sidebar .sidebar-user-text { display: none !important; }
+  .desktop-sidebar nav { overflow: visible !important; }
+  .desktop-sidebar .nav-link {
+    justify-content: center !important;
+    padding: 10px !important;
+    position: relative;
+  }
+  .desktop-sidebar .active-dot { display: none !important; }
+  /* Reveal tooltip on hover */
+  .desktop-sidebar .nav-link .nav-tooltip {
+    display: block !important;
+    position: absolute;
+    left: calc(100% + 10px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--bg2);
+    color: var(--ink);
+    border: 1px solid var(--bd2);
+    border-radius: 8px;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    z-index: 1000;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .desktop-sidebar .nav-link:hover .nav-tooltip { opacity: 1 !important; }
+}
+
+/* ══════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE — PHASE 2: DASHBOARD GRIDS
+   ══════════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  .dash-kpi-grid    { grid-template-columns: 1fr 1fr !important; }
+  .dash-chart-row   { grid-template-columns: 1fr !important; }
+  .dash-cashflow-row{ grid-template-columns: 1fr !important; }
+  .dash-goals-row   { grid-template-columns: 1fr !important; }
+  .dash-apps-grid   { grid-template-columns: 1fr 1fr !important; }
+  /* Stat grids across all pages */
+  .stat-grid-3      { grid-template-columns: 1fr 1fr !important; }
+  /* Quick action buttons wrap nicely already (flexWrap:wrap) */
+}
+
+/* ══════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE — PHASE 3: TABLES → CARDS
+   ══════════════════════════════════════════════════════════ */
+.mobile-cards { display: none; }
+
+@media (max-width: 767px) {
+  .mobile-table-hide { display: none !important; }
+  .mobile-cards {
+    display: block;
+    padding: 12px 16px 16px;
+  }
+  .mobile-card {
+    background: var(--card);
+    border: 1px solid var(--card-bd);
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 8px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  /* Collapse 3-col form grids to 1-col on mobile */
+  .form-grid-3 { grid-template-columns: 1fr !important; }
+}
+
+/* ══════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE — PHASE 4: MODALS
+   ══════════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  .modal-backdrop {
+    padding: 0 !important;
+    align-items: flex-end !important;
+  }
+  .modal-inner {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 92dvh !important;
+    max-height: 92dvh !important;
+    border-radius: 20px 20px 0 0 !important;
+  }
+  /* Hide context tips panel on mobile — saves critical space */
+  .modal-context-panel { display: none !important; }
+  /* Right-side drawers (clients, invoices) go full-width */
+  .side-drawer-panel { width: 100% !important; }
+}

@@ -60,7 +60,7 @@ export default function ExpensesPage() {
           <button className="btn-primary" onClick={() => setShowForm(true)}>+ Add expense</button>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 24 }}>
+        <div className="stat-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 24 }}>
           {[
             { label: 'Total Expenses', value: `$${total.toFixed(2)}`, color: '#ff7043' },
             { label: 'Tax Deductible', value: `$${deductible.toFixed(2)}`, color: '#10b981' },
@@ -84,7 +84,7 @@ export default function ExpensesPage() {
                 initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
                 onSubmit={add} style={{ padding: '20px 24px', borderBottom: '1px solid var(--bd)', background: 'rgba(255,112,67,0.04)', overflow: 'hidden' }}
               >
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+                <div className="form-grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
                   <div>
                     <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--mu)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Vendor</label>
                     <input className="input" style={{ marginTop: 6 }} required value={form.vendor} onChange={e => setForm(f => ({ ...f, vendor: e.target.value }))} placeholder="Adobe, AWS, etc." />
@@ -134,38 +134,72 @@ export default function ExpensesPage() {
               <button className="btn-primary" onClick={() => setShowForm(true)}>Add expense →</button>
             </div>
           ) : (
-            <table className="table-base">
-              <thead>
-                <tr>
-                  <th style={{ paddingLeft: 24 }}>Vendor</th>
-                  <th>Category</th>
-                  <th>Date</th>
-                  <th>Deductible</th>
-                  <th style={{ textAlign: 'right', paddingRight: 24 }}>Amount</th>
-                </tr>
-              </thead>
-              <tbody>
+            <>
+              {/* Desktop table */}
+              <div className="mobile-table-hide">
+                <table className="table-base">
+                  <thead>
+                    <tr>
+                      <th style={{ paddingLeft: 24 }}>Vendor</th>
+                      <th>Category</th>
+                      <th>Date</th>
+                      <th>Deductible</th>
+                      <th style={{ textAlign: 'right', paddingRight: 24 }}>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map(item => (
+                      <tr key={item.id}>
+                        <td style={{ paddingLeft: 24 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(255,112,67,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>🧮</div>
+                            <span style={{ fontWeight: 500 }}>{item.vendor}</span>
+                          </div>
+                        </td>
+                        <td style={{ color: 'var(--mu)', fontSize: 12 }}>{item.category}</td>
+                        <td style={{ color: 'var(--mu)', fontSize: 12 }}>{new Date(item.date).toLocaleDateString()}</td>
+                        <td><span style={{ fontSize: 11, color: item.is_deductible ? '#10b981' : 'var(--mu)' }}>{item.is_deductible ? '✓ Yes' : 'No'}</span></td>
+                        <td style={{ textAlign: 'right', paddingRight: 24 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12 }}>
+                            <span style={{ fontFamily: 'var(--font-mono, DM Mono, monospace)', fontWeight: 600, color: '#ff7043' }}>-${Number(item.amount).toFixed(2)}</span>
+                            <button onClick={() => remove(item.id)} style={{ opacity: 0, background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 12, padding: '2px 6px', borderRadius: 6 }} className="del-btn">✕</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile card list */}
+              <div className="mobile-cards">
                 {items.map(item => (
-                  <tr key={item.id}>
-                    <td style={{ paddingLeft: 24 }}>
+                  <div key={item.id} className="mobile-card">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <p style={{ fontWeight: 600, fontSize: 14, color: 'var(--ink)' }}>{item.vendor}</p>
+                        <p style={{ fontSize: 12, color: 'var(--mu)', marginTop: 2 }}>{item.category}</p>
+                      </div>
+                      <p style={{ fontFamily: 'DM Mono, monospace', fontWeight: 700, color: '#ff7043', fontSize: 15 }}>-${Number(item.amount).toFixed(2)}</p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(255,112,67,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>🧮</div>
-                        <span style={{ fontWeight: 500 }}>{item.vendor}</span>
+                        <span style={{ fontSize: 11, color: item.is_deductible ? '#10b981' : 'var(--mu)', fontWeight: 600 }}>
+                          {item.is_deductible ? '✓ Deductible' : 'Non-deductible'}
+                        </span>
+                        <span style={{ fontSize: 11, color: 'var(--mu)' }}>{new Date(item.date).toLocaleDateString()}</span>
                       </div>
-                    </td>
-                    <td style={{ color: 'var(--mu)', fontSize: 12 }}>{item.category}</td>
-                    <td style={{ color: 'var(--mu)', fontSize: 12 }}>{new Date(item.date).toLocaleDateString()}</td>
-                    <td><span style={{ fontSize: 11, color: item.is_deductible ? '#10b981' : 'var(--mu)' }}>{item.is_deductible ? '✓ Yes' : 'No'}</span></td>
-                    <td style={{ textAlign: 'right', paddingRight: 24 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12 }}>
-                        <span style={{ fontFamily: 'var(--font-mono, DM Mono, monospace)', fontWeight: 600, color: '#ff7043' }}>-${Number(item.amount).toFixed(2)}</span>
-                        <button onClick={() => remove(item.id)} style={{ opacity: 0, background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 12, padding: '2px 6px', borderRadius: 6 }} className="del-btn">✕</button>
-                      </div>
-                    </td>
-                  </tr>
+                      <button
+                        onClick={() => remove(item.id)}
+                        style={{ fontSize: 12, color: '#ef4444', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '4px 10px', cursor: 'pointer' }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </>
           )}
         </div>
       </motion.div>

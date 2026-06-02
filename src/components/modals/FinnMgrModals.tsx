@@ -87,7 +87,7 @@ function Field({ label, htmlFor, tip, tipId, children }: {
 /* ── Context panel ────────────────────────────────────────────────────────── */
 function ContextPanel({ title, icon, bullets }: { title: string; icon: string; bullets: string[] }) {
   return (
-    <div style={{
+    <div className="modal-context-panel" style={{
       width: 200, flexShrink: 0, background: 'var(--bg3)',
       borderLeft: '1px solid var(--bd)', padding: '24px 18px',
       display: 'flex', flexDirection: 'column', gap: 0,
@@ -129,6 +129,7 @@ function ModalShell({
 
   return (
     <motion.div
+      className="modal-backdrop"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       onClick={onClose}
       role="dialog"
@@ -141,6 +142,7 @@ function ModalShell({
       }}
     >
       <motion.div
+        className="modal-inner"
         data-modal={id}
         initial={{ opacity: 0, scale: 0.93, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}

@@ -6,8 +6,11 @@
   ALTER TABLE clients ADD COLUMN IF NOT EXISTS website text;
   ALTER TABLE clients ADD COLUMN IF NOT EXISTS industry text;
   ALTER TABLE clients ADD COLUMN IF NOT EXISTS notes text;
+  ALTER TABLE clients ADD COLUMN IF NOT EXISTS client_group text;
+  ALTER TABLE clients ADD COLUMN IF NOT EXISTS archived_at timestamptz;
+  ALTER TABLE clients ADD COLUMN IF NOT EXISTS address text;
 */
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import CountUp from 'react-countup'
@@ -20,12 +23,13 @@ type Client = {
   id: string; user_id: string; name: string; email?: string; phone?: string
   company?: string; total_billed: number; total_paid: number; invoice_count: number
   status: string; avatar_color: string; created_at: string; updated_at?: string
-  payment_terms?: string; tags?: string[]; website?: string; industry?: string; notes?: string
+  payment_terms?: string; tags?: string[]; website?: string; industry?: string
+  notes?: string; client_group?: string; archived_at?: string; address?: string
 }
 type ClientForm = {
   name: string; company: string; email: string; phone: string; address: string
   website: string; industry: string; status: string; payment_terms: string
-  tags: string[]; notes: string
+  tags: string[]; notes: string; client_group: string
 }
 
 /* ── Constants ── */
@@ -37,8 +41,11 @@ const STATUS_MAP: Record<string, string> = {
 const STATUS_LABELS = ['lead','client','vip','recurring','inactive','at-risk']
 const INDUSTRIES = ['Technology','Marketing','Design','Consulting','Healthcare','Finance','Legal','Real Estate','Education','E-commerce','Other']
 const PAYMENT_TERMS = ['Due Upon Receipt','Net 7','Net 15','Net 30','Net 60','Custom']
-const DEFAULT_FORM: ClientForm = { name:'', company:'', email:'', phone:'', address:'', website:'', industry:'', status:'client', payment_terms:'Net 30', tags:[], notes:'' }
-
+const TAG_PRESETS = ['High Value','Monthly','Late Payer','Priority','Needs Follow Up']
+const DEFAULT_FORM: ClientForm = {
+  name: '', company: '', email: '', phone: '', address: '', website: '',
+  industry: '', status: 'client', payment_terms: 'Net 30', tags: [], notes: '', client_group: '',
+}
 const STAT_TOOLTIPS: Record<string, string> = {
   total: 'The total number of clients in your account.',
   active: 'Clients with an active, VIP, or recurring status.',
@@ -46,12 +53,23 @@ const STAT_TOOLTIPS: Record<string, string> = {
   revenue: 'Total amount billed to all clients combined.',
   outstanding: 'Money your clients still owe your business.',
   avg: 'Average revenue generated per client.',
-  new: 'Clients added since the 1st of this month.',
   repeat: 'Clients with more than one invoice on record.',
+  atRisk: 'Clients with an at-risk status — needs immediate attention.',
+  new: 'Clients added since the 1st of this month.',
 }
 
 function initials(name: string) {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+}
+
+function makeForm(c?: Client): ClientForm {
+  if (!c) return { ...DEFAULT_FORM }
+  return {
+    name: c.name, company: c.company ?? '', email: c.email ?? '',
+    phone: c.phone ?? '', address: c.address ?? '', website: c.website ?? '',
+    industry: c.industry ?? '', status: c.status, payment_terms: c.payment_terms ?? 'Net 30',
+    tags: c.tags ?? [], notes: c.notes ?? '', client_group: c.client_group ?? '',
+  }
 }
 
 /* ── Chart tooltip ── */
@@ -65,7 +83,6 @@ function ChartTip({ active, payload, label }: { active?: boolean; payload?: { va
   )
 }
 
-/* ── Build growth chart data ── */
 function buildGrowthData(clients: Client[], view: 'monthly' | 'quarterly' | 'yearly') {
   if (clients.length === 0) return []
   const counts: Record<string, number> = {}
@@ -80,6 +97,64 @@ function buildGrowthData(clients: Client[], view: 'monthly' | 'quarterly' | 'yea
   return Object.entries(counts).map(([label, count]) => ({ label, count }))
 }
 
+/* ── Learn Panel ── */
+function LearnPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
+  useEffect(() => {
+    if (!open) return
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', h)
+    return () => document.removeEventListener('keydown', h)
+  }, [open, onClose])
+
+  const sections = [
+    { icon: '👥', title: 'Client Statuses', body: 'Lead = prospect, Client = active payer, VIP = high-value relationship, Recurring = subscription, Inactive = paused, At-Risk = late payments or unresponsive.' },
+    { icon: '🏷️', title: 'Tags & Presets', body: 'Use tags to segment clients quickly. Tap a preset (High Value, Monthly, etc.) in the form or add custom tags. The Tag filter lets you narrow the list to any tag.' },
+    { icon: '🗂️', title: 'Groups', body: 'Groups let you bucket clients by department, project type, or team. Add a group in the client form, then use the Group Filter to focus on a segment.' },
+    { icon: '📊', title: 'Health Score', body: 'Health is computed from payment completion ratio, overdue invoices, outstanding balance, and client status. Aim to keep key clients above 70.' },
+    { icon: '💡', title: 'Smart Insights', body: 'The Insights panel surfaces live signals: revenue concentration, overdue balances, inactive clients, at-risk flags, and more — always reflecting your current data.' },
+    { icon: '📁', title: 'Archive vs Delete', body: 'Archive hides a client from your active list while preserving all data and invoice history. Delete is permanent and should only be used for test or duplicate records.' },
+    { icon: '🧾', title: 'Quick Invoice', body: 'Click the Invoice button on any table row to jump to the invoice builder pre-scoped to that client. Saves you time on repeat billing.' },
+    { icon: '✉️', title: 'Email Action', body: 'The ✉️ button on a row opens your default mail client with the address prefilled. If the mailto link is blocked, your clipboard gets the address automatically.' },
+  ]
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={onClose}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)', zIndex: 799 }} />
+          <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 30, stiffness: 280 }}
+            className="side-drawer-panel"
+            style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 420, background: 'var(--bg2)', borderLeft: '1px solid var(--bd2)', zIndex: 800, display: 'flex', flexDirection: 'column', boxShadow: '-20px 0 60px rgba(0,0,0,0.3)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px', borderBottom: '1px solid var(--bd)' }}>
+              <div>
+                <h3 style={{ fontWeight: 900, fontSize: 17, color: 'var(--ink)', letterSpacing: '-0.03em' }}>Clients Guide</h3>
+                <p style={{ fontSize: 11, color: 'var(--mu)', marginTop: 2 }}>How to get the most from your client module.</p>
+              </div>
+              <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--mu)', fontSize: 22, lineHeight: 1 }}>×</button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {sections.map(s => (
+                  <div key={s.title} style={{ padding: '14px 16px', borderRadius: 14, background: 'var(--bg3)', border: '1px solid var(--bd)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                      <span style={{ fontSize: 17 }}>{s.icon}</span>
+                      <h4 style={{ fontWeight: 800, fontSize: 13, color: 'var(--ink)', letterSpacing: '-0.02em' }}>{s.title}</h4>
+                    </div>
+                    <p style={{ fontSize: 12, color: 'var(--mu)', lineHeight: 1.65 }}>{s.body}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  )
+}
+
 /* ── Add/Edit Client Drawer ── */
 function ClientDrawer({
   open, onClose, onSaved, colorIndex, initial,
@@ -87,12 +162,7 @@ function ClientDrawer({
   open: boolean; onClose: () => void; onSaved: (c: Client) => void
   colorIndex: number; initial?: Client
 }) {
-  const [form, setForm] = useState<ClientForm>(initial ? {
-    name: initial.name, company: initial.company ?? '', email: initial.email ?? '',
-    phone: initial.phone ?? '', address: '', website: initial.website ?? '',
-    industry: initial.industry ?? '', status: initial.status, payment_terms: initial.payment_terms ?? 'Net 30',
-    tags: initial.tags ?? [], notes: initial.notes ?? '',
-  } : { ...DEFAULT_FORM })
+  const [form, setForm] = useState<ClientForm>(() => makeForm(initial))
   const [tagInput, setTagInput] = useState('')
   const [saving, setSaving] = useState(false)
   const isEdit = !!initial
@@ -105,21 +175,14 @@ function ClientDrawer({
   }, [open, onClose])
 
   useEffect(() => {
-    if (open) {
-      setForm(initial ? {
-        name: initial.name, company: initial.company ?? '', email: initial.email ?? '',
-        phone: initial.phone ?? '', address: '', website: initial.website ?? '',
-        industry: initial.industry ?? '', status: initial.status, payment_terms: initial.payment_terms ?? 'Net 30',
-        tags: initial.tags ?? [], notes: initial.notes ?? '',
-      } : { ...DEFAULT_FORM })
-      setTagInput('')
-    }
-  }, [open, initial])
+    if (open) { setForm(makeForm(initial)); setTagInput('') }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initial?.id])
 
-  function addTag() {
-    const val = tagInput.trim().replace(/,/g, '')
+  function addTag(preset?: string) {
+    const val = (preset ?? tagInput).trim().replace(/,/g, '')
     if (val && !form.tags.includes(val)) setForm(f => ({ ...f, tags: [...f.tags, val] }))
-    setTagInput('')
+    if (!preset) setTagInput('')
   }
 
   function removeTag(t: string) { setForm(f => ({ ...f, tags: f.tags.filter(x => x !== t) })) }
@@ -147,8 +210,15 @@ function ClientDrawer({
     }
   }
 
-  const iStyle: React.CSSProperties = { width: '100%', padding: '9px 14px', background: 'var(--in-bg)', border: '1.5px solid var(--in-bd)', borderRadius: 10, fontSize: 13, color: 'var(--in-txt)', outline: 'none', fontFamily: 'inherit', marginTop: 6 }
-  const labelStyle: React.CSSProperties = { fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--mu)', display: 'block' }
+  const iStyle: React.CSSProperties = {
+    width: '100%', padding: '9px 14px', background: 'var(--in-bg)',
+    border: '1.5px solid var(--in-bd)', borderRadius: 10, fontSize: 13,
+    color: 'var(--in-txt)', outline: 'none', fontFamily: 'inherit', marginTop: 6,
+  }
+  const lStyle: React.CSSProperties = {
+    fontSize: 10, fontWeight: 800, textTransform: 'uppercase',
+    letterSpacing: '0.07em', color: 'var(--mu)', display: 'block',
+  }
 
   return (
     <AnimatePresence>
@@ -159,8 +229,9 @@ function ClientDrawer({
             style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)', zIndex: 799 }} />
           <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 280 }}
+            className="side-drawer-panel"
             style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 460, background: 'var(--bg2)', borderLeft: '1px solid var(--bd2)', zIndex: 800, display: 'flex', flexDirection: 'column', boxShadow: '-20px 0 60px rgba(0,0,0,0.3)' }}>
-            {/* Header */}
+
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px', borderBottom: '1px solid var(--bd)' }}>
               <div>
                 <h3 style={{ fontWeight: 900, fontSize: 17, color: 'var(--ink)', letterSpacing: '-0.03em' }}>{isEdit ? 'Edit Client' : 'Add Client'}</h3>
@@ -171,38 +242,45 @@ function ClientDrawer({
               <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--mu)', fontSize: 22, lineHeight: 1 }}>×</button>
             </div>
 
-            {/* Scrollable body */}
             <form onSubmit={submit} style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <div style={{ gridColumn: '1/-1' }}>
-                  <label style={labelStyle}>Full Name *</label>
+                  <label style={lStyle}>Full Name *</label>
                   <input style={iStyle} required placeholder="Jane Smith" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
                 </div>
                 <div>
-                  <label style={labelStyle}>Company</label>
+                  <label style={lStyle}>Company</label>
                   <input style={iStyle} placeholder="Acme Corp" value={form.company} onChange={e => setForm(f => ({ ...f, company: e.target.value }))} />
                 </div>
                 <div>
-                  <label style={labelStyle}>Industry</label>
+                  <label style={lStyle}>Industry</label>
                   <select style={iStyle} value={form.industry} onChange={e => setForm(f => ({ ...f, industry: e.target.value }))}>
                     <option value="">Select industry</option>
                     {INDUSTRIES.map(i => <option key={i}>{i}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label style={labelStyle}>Email *</label>
+                  <label style={lStyle}>Email *</label>
                   <input style={iStyle} type="email" required placeholder="jane@example.com" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
                 </div>
                 <div>
-                  <label style={labelStyle}>Phone</label>
+                  <label style={lStyle}>Phone</label>
                   <input style={iStyle} placeholder="+1 (555) 000-0000" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
                 </div>
                 <div style={{ gridColumn: '1/-1' }}>
-                  <label style={labelStyle}>Website</label>
+                  <label style={lStyle}>Website</label>
                   <input style={iStyle} placeholder="https://example.com" value={form.website} onChange={e => setForm(f => ({ ...f, website: e.target.value }))} />
                 </div>
+                <div style={{ gridColumn: '1/-1' }}>
+                  <label style={lStyle}>Address</label>
+                  <input style={iStyle} placeholder="123 Main St, City, State" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} />
+                </div>
+                <div style={{ gridColumn: '1/-1' }}>
+                  <label style={lStyle}>Group</label>
+                  <input style={iStyle} placeholder="e.g. Enterprise, Agency, Startup" value={form.client_group} onChange={e => setForm(f => ({ ...f, client_group: e.target.value }))} />
+                </div>
                 <div>
-                  <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <label style={{ ...lStyle, display: 'flex', alignItems: 'center', gap: 6 }}>
                     Status
                     <span title="Lead = prospect, Client = active, VIP = high-value, Recurring = subscription" style={{ cursor: 'help', fontSize: 12 }}>ℹ️</span>
                   </label>
@@ -211,7 +289,7 @@ function ClientDrawer({
                   </select>
                 </div>
                 <div>
-                  <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <label style={{ ...lStyle, display: 'flex', alignItems: 'center', gap: 6 }}>
                     Payment Terms
                     <span title="When invoices are due relative to the issue date" style={{ cursor: 'help', fontSize: 12 }}>ℹ️</span>
                   </label>
@@ -219,13 +297,33 @@ function ClientDrawer({
                     {PAYMENT_TERMS.map(t => <option key={t}>{t}</option>)}
                   </select>
                 </div>
+
+                {/* Tags with presets */}
                 <div style={{ gridColumn: '1/-1' }}>
-                  <label style={labelStyle}>Tags</label>
-                  <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                    <input style={{ ...iStyle, marginTop: 0, flex: 1 }} placeholder="Add tag, press Enter" value={tagInput}
+                  <label style={lStyle}>Tags</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8, marginBottom: 8 }}>
+                    {TAG_PRESETS.map(p => {
+                      const active = form.tags.includes(p)
+                      return (
+                        <button key={p} type="button"
+                          onClick={() => active ? removeTag(p) : addTag(p)}
+                          style={{
+                            padding: '4px 11px', borderRadius: 99, fontSize: 10, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s',
+                            border: `1.5px solid ${active ? '#6366f1' : 'var(--bd2)'}`,
+                            background: active ? 'rgba(99,102,241,0.14)' : 'var(--bg3)',
+                            color: active ? '#6366f1' : 'var(--mu)',
+                          }}>
+                          {active ? '✓ ' : ''}{p}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input style={{ ...iStyle, marginTop: 0, flex: 1 }} placeholder="Custom tag, press Enter"
+                      value={tagInput}
                       onChange={e => setTagInput(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag() } }} />
-                    <button type="button" onClick={addTag} className="btn-ghost" style={{ padding: '9px 14px', whiteSpace: 'nowrap' }}>Add</button>
+                    <button type="button" onClick={() => addTag()} className="btn-ghost" style={{ padding: '9px 14px', whiteSpace: 'nowrap' }}>Add</button>
                   </div>
                   {form.tags.length > 0 && (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
@@ -238,14 +336,16 @@ function ClientDrawer({
                     </div>
                   )}
                 </div>
+
                 <div style={{ gridColumn: '1/-1' }}>
-                  <label style={labelStyle}>Notes</label>
-                  <textarea style={{ ...iStyle, height: 80, resize: 'none', lineHeight: 1.6 }} placeholder="e.g. Prefers email. Decision maker is Sarah." value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+                  <label style={lStyle}>Notes</label>
+                  <textarea style={{ ...iStyle, height: 80, resize: 'none', lineHeight: 1.6 }}
+                    placeholder="e.g. Prefers email. Decision maker is Sarah."
+                    value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
                 </div>
               </div>
             </form>
 
-            {/* Sticky footer */}
             <div style={{ padding: '16px 24px', borderTop: '1px solid var(--bd)', display: 'flex', gap: 10 }}>
               <button onClick={submit as unknown as React.MouseEventHandler} disabled={saving} className="btn-primary" style={{ flex: 1, justifyContent: 'center', padding: 12 }}>
                 {saving ? 'Saving...' : isEdit ? 'Save Changes' : 'Save Client'}
@@ -260,22 +360,43 @@ function ClientDrawer({
 }
 
 /* ── Empty State ── */
-function EmptyState({ onAdd }: { onAdd: () => void }) {
+function EmptyState({ onAdd, onLearn }: { onAdd: () => void; onLearn: () => void }) {
   return (
-    <div className="empty-state" style={{ padding: '80px 24px' }}>
-      <span className="empty-icon">👥</span>
-      <h3>No clients yet — your first is the most important</h3>
-      <p>Add clients to streamline your business:</p>
-      <ul style={{ textAlign: 'left', display: 'inline-block', margin: '8px 0 20px', fontSize: 13, color: 'var(--mu)', lineHeight: 2 }}>
-        <li>✓ Create invoices faster with saved client details</li>
-        <li>✓ Track revenue and outstanding balances per client</li>
-        <li>✓ Monitor payment history and activity</li>
-        <li>✓ Keep all client records organized in one place</li>
-      </ul>
-      <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-        <button className="btn-primary" onClick={onAdd}>Add First Client →</button>
-        <button className="btn-ghost" onClick={() => toast('Add your first client to unlock insights! 💡')}>Learn More</button>
-      </div>
+    <div style={{ padding: '80px 24px', textAlign: 'center' }}>
+      <motion.div initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', damping: 18, stiffness: 200 }}>
+        <div style={{
+          width: 88, height: 88, borderRadius: 28, margin: '0 auto 24px',
+          background: 'linear-gradient(135deg, rgba(99,102,241,0.14), rgba(139,92,246,0.18))',
+          border: '1.5px solid rgba(99,102,241,0.2)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 38, animation: 'float 3s ease-in-out infinite',
+        }}>
+          👥
+        </div>
+        <h3 style={{ fontWeight: 900, fontSize: 20, color: 'var(--ink)', letterSpacing: '-0.035em', marginBottom: 8 }}>
+          Your client list is empty
+        </h3>
+        <p style={{ fontSize: 13, color: 'var(--mu)', lineHeight: 1.7, maxWidth: 320, margin: '0 auto 28px' }}>
+          Add your first client to start tracking revenue, sending invoices, and building your business relationships.
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, maxWidth: 400, margin: '0 auto 28px' }}>
+          {[
+            { icon: '🧾', text: 'Create invoices faster with saved client details' },
+            { icon: '💰', text: 'Track revenue and outstanding balances per client' },
+            { icon: '📊', text: 'Monitor payment history and invoice activity' },
+            { icon: '🏷️', text: 'Organise by tags, groups, status, and more' },
+          ].map(f => (
+            <div key={f.text} style={{ padding: '12px 14px', borderRadius: 12, background: 'var(--bg3)', border: '1px solid var(--bd)', display: 'flex', alignItems: 'flex-start', gap: 10, textAlign: 'left' }}>
+              <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>{f.icon}</span>
+              <span style={{ fontSize: 11, color: 'var(--mu)', lineHeight: 1.55 }}>{f.text}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+          <button className="btn-primary" onClick={onAdd} style={{ padding: '11px 24px' }}>+ Add First Client</button>
+          <button className="btn-ghost" onClick={onLearn}>? Learn More</button>
+        </div>
+      </motion.div>
     </div>
   )
 }
@@ -287,76 +408,177 @@ export default function ClientsPage() {
   const router = useRouter()
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
-  const [userId, setUserId] = useState('')
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [editClient, setEditClient] = useState<Client | null>(null)
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
-  const [sortKey, setSortKey] = useState<'name'|'revenue'|'balance'|'created_at'>('created_at')
-  const [sortDir, setSortDir] = useState<'asc'|'desc'>('desc')
-  const [chartView, setChartView] = useState<'monthly'|'quarterly'|'yearly'>('monthly')
-  const [hoveredStat, setHoveredStat] = useState<string|null>(null)
+  const [filterTag, setFilterTag] = useState<string | null>(null)
+  const [filterGroup, setFilterGroup] = useState<string | null>(null)
+  const [showArchived, setShowArchived] = useState(false)
+  const [sortKey, setSortKey] = useState<'name' | 'revenue' | 'balance' | 'created_at'>('created_at')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [chartView, setChartView] = useState<'monthly' | 'quarterly' | 'yearly'>('monthly')
+  const [hoveredStat, setHoveredStat] = useState<string | null>(null)
+  const [learnOpen, setLearnOpen] = useState(false)
 
   const load = useCallback(async () => {
+    setLoading(true)
     const sb = createClient()
     const { data: { user } } = await sb.auth.getUser()
     if (!user) return
-    setUserId(user.id)
-    const { data } = await sb.from('clients').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
+    const q = sb.from('clients').select('*').eq('user_id', user.id)
+    const { data } = await (showArchived
+      ? q.not('archived_at', 'is', null).order('archived_at', { ascending: false })
+      : q.is('archived_at', null).order('created_at', { ascending: false }))
     setClients(data ?? [])
     setLoading(false)
-  }, [])
+  }, [showArchived])
 
   useEffect(() => { load() }, [load])
 
-  /* Computed stats */
+  /* ── Actions ── */
+  async function archiveClient(c: Client, e: React.MouseEvent) {
+    e.stopPropagation()
+    const sb = createClient()
+    const { error } = await sb.from('clients').update({ archived_at: new Date().toISOString() }).eq('id', c.id)
+    if (error) { toast.error('Failed to archive'); return }
+    setClients(prev => prev.filter(x => x.id !== c.id))
+    toast.success(`${c.name} archived`)
+  }
+
+  async function restoreClient(c: Client, e: React.MouseEvent) {
+    e.stopPropagation()
+    const sb = createClient()
+    const { error } = await sb.from('clients').update({ archived_at: null }).eq('id', c.id)
+    if (error) { toast.error('Failed to restore'); return }
+    setClients(prev => prev.filter(x => x.id !== c.id))
+    toast.success(`${c.name} restored`)
+  }
+
+  async function deleteClient(c: Client, e: React.MouseEvent) {
+    e.stopPropagation()
+    if (!window.confirm(`Permanently delete ${c.name}? This cannot be undone.`)) return
+    const sb = createClient()
+    const { error } = await sb.from('clients').delete().eq('id', c.id)
+    if (error) { toast.error('Failed to delete'); return }
+    setClients(prev => prev.filter(x => x.id !== c.id))
+    toast.success(`${c.name} deleted`)
+  }
+
+  function emailClient(c: Client, e: React.MouseEvent) {
+    e.stopPropagation()
+    if (!c.email) { toast.error('No email address on file'); return }
+    try {
+      const opened = window.open(`mailto:${c.email}`, '_self')
+      if (!opened) throw new Error('blocked')
+    } catch {
+      navigator.clipboard.writeText(c.email)
+        .then(() => toast.success(`Email copied: ${c.email}`))
+        .catch(() => toast(`Email: ${c.email}`))
+    }
+  }
+
+  /* ── Computed stats ── */
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
   const totalRevenue = clients.reduce((s, c) => s + Number(c.total_billed), 0)
   const outstanding = clients.reduce((s, c) => s + Math.max(0, Number(c.total_billed) - Number(c.total_paid)), 0)
-  const activeClients = clients.filter(c => ['client','vip','recurring'].includes(c.status)).length
-  const inactiveClients = clients.filter(c => ['inactive','lead'].includes(c.status)).length
+  const activeClients = clients.filter(c => ['client', 'vip', 'recurring'].includes(c.status)).length
+  const inactiveClients = clients.filter(c => ['inactive', 'lead'].includes(c.status)).length
   const avgValue = clients.length > 0 ? totalRevenue / clients.length : 0
   const newThisMonth = clients.filter(c => new Date(c.created_at) >= monthStart).length
   const repeatClients = clients.filter(c => Number(c.invoice_count) > 1).length
+  const atRiskClients = clients.filter(c => c.status === 'at-risk').length
 
   /* Top 5 */
   const top5 = [...clients].sort((a, b) => Number(b.total_billed) - Number(a.total_billed)).slice(0, 5)
   const maxBilled = top5[0]?.total_billed ?? 1
 
-  /* Smart insights */
+  /* Unique tags + groups */
+  const allTags = useMemo(() => {
+    const s = new Set<string>()
+    clients.forEach(c => (c.tags ?? []).forEach(t => s.add(t)))
+    return [...s].sort()
+  }, [clients])
+
+  const allGroups = useMemo(() => {
+    const s = new Set<string>()
+    clients.forEach(c => { if (c.client_group) s.add(c.client_group) })
+    return [...s].sort()
+  }, [clients])
+
+  /* ── Smart Insights (7+ cases) ── */
   const insights = useMemo(() => {
     const list: { icon: string; msg: string; action: string; color: string; onAction: () => void }[] = []
     if (clients.length === 0) return list
     const totalRev = clients.reduce((s, c) => s + Number(c.total_billed), 0)
+    const withBalance = clients.filter(c => Number(c.total_billed) - Number(c.total_paid) > 0)
+
+    // 1. Top client by revenue
     const topClient = [...clients].sort((a, b) => Number(b.total_billed) - Number(a.total_billed))[0]
     if (topClient && totalRev > 0) {
       const pct = Math.round((Number(topClient.total_billed) / totalRev) * 100)
       list.push({ icon: '🏆', msg: `${topClient.name} generated ${pct}% of your total revenue`, action: 'View client', color: '#10b981', onAction: () => router.push(`/clients/${topClient.id}`) })
     }
-    const withBalance = clients.filter(c => Number(c.total_billed) - Number(c.total_paid) > 0)
+
+    // 2. Overdue / outstanding balance
     if (withBalance.length > 0) {
-      const worst = withBalance.sort((a, b) => (Number(b.total_billed) - Number(b.total_paid)) - (Number(a.total_billed) - Number(a.total_paid)))[0]
+      const worst = [...withBalance].sort((a, b) => (Number(b.total_billed) - Number(b.total_paid)) - (Number(a.total_billed) - Number(a.total_paid)))[0]
       const bal = Number(worst.total_billed) - Number(worst.total_paid)
       list.push({ icon: '⚠️', msg: `${worst.name} has an outstanding balance of $${bal.toFixed(2)}`, action: 'Send reminder', color: '#f59e0b', onAction: () => toast.success(`Reminder queued for ${worst.name} 📨`) })
     }
+
+    // 3. Inactive 60+ days
+    const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000)
+    const inactive60 = clients.filter(c =>
+      ['client', 'vip', 'recurring'].includes(c.status) &&
+      new Date(c.updated_at ?? c.created_at) < sixtyDaysAgo
+    )
+    if (inactive60.length > 0) {
+      list.push({ icon: '💤', msg: `${inactive60.length} active client${inactive60.length > 1 ? 's' : ''} with no activity in 60+ days`, action: 'Review', color: '#8b5cf6', onAction: () => setFilterStatus('client') })
+    }
+
+    // 4. High Value tag count
+    const hvCount = clients.filter(c => (c.tags ?? []).includes('High Value')).length
+    if (hvCount > 0) {
+      list.push({ icon: '💎', msg: `${hvCount} client${hvCount > 1 ? 's' : ''} tagged High Value — consider a loyalty outreach`, action: 'View tagged', color: '#0ea5e9', onAction: () => setFilterTag('High Value') })
+    }
+
+    // 5. Unpaid total across multiple clients
+    if (withBalance.length > 1) {
+      const totalUnpaid = withBalance.reduce((s, c) => s + (Number(c.total_billed) - Number(c.total_paid)), 0)
+      list.push({ icon: '💵', msg: `$${totalUnpaid.toFixed(2)} outstanding across ${withBalance.length} clients`, action: 'Filter unpaid', color: '#f59e0b', onAction: () => setFilterStatus('has-balance') })
+    }
+
+    // 6. New this month
     if (newThisMonth > 0) {
       list.push({ icon: '🎉', msg: `${newThisMonth} new client${newThisMonth > 1 ? 's' : ''} added this month`, action: 'View all', color: '#6366f1', onAction: () => setFilterStatus('all') })
     }
-    if (activeClients === 0 && clients.length > 0) {
-      list.push({ icon: '💡', msg: 'No active clients yet — update client statuses to track revenue', action: 'Learn more', color: '#0ea5e9', onAction: () => toast('Set client status to Client, VIP, or Recurring to track them as active.') })
-    }
-    return list.slice(0, 4)
-  }, [clients, newThisMonth, activeClients, router])
 
-  /* Filter + sort */
+    // 7. At-risk clients
+    if (atRiskClients > 0) {
+      list.push({ icon: '🚨', msg: `${atRiskClients} client${atRiskClients > 1 ? 's' : ''} flagged at-risk — act before you lose them`, action: 'View at-risk', color: '#ef4444', onAction: () => setFilterStatus('at-risk') })
+    }
+
+    // 8. No active clients nudge
+    if (activeClients === 0 && clients.length > 0) {
+      list.push({ icon: '💡', msg: 'No active clients yet — update statuses to start tracking revenue accurately', action: 'Learn more', color: '#0ea5e9', onAction: () => setLearnOpen(true) })
+    }
+
+    return list.slice(0, 6)
+  }, [clients, newThisMonth, activeClients, atRiskClients, router])
+
+  /* ── Filter + sort ── */
   const filtered = useMemo(() => {
     let list = [...clients]
     if (search) {
       const q = search.toLowerCase()
-      list = list.filter(c => [c.name, c.company, c.email, c.phone, c.notes].some(f => f?.toLowerCase().includes(q)))
+      list = list.filter(c => [c.name, c.company, c.email, c.phone, c.notes, c.client_group].some(f => f?.toLowerCase().includes(q)))
     }
     if (filterStatus === 'has-balance') list = list.filter(c => Number(c.total_billed) - Number(c.total_paid) > 0)
     else if (filterStatus !== 'all') list = list.filter(c => c.status === filterStatus)
+    if (filterTag) list = list.filter(c => (c.tags ?? []).includes(filterTag))
+    if (filterGroup) list = list.filter(c => c.client_group === filterGroup)
     list.sort((a, b) => {
       let av: number | string, bv: number | string
       if (sortKey === 'revenue') { av = Number(a.total_billed); bv = Number(b.total_billed) }
@@ -366,13 +588,12 @@ export default function ClientsPage() {
       return sortDir === 'asc' ? (av > bv ? 1 : -1) : (av < bv ? 1 : -1)
     })
     return list
-  }, [clients, search, filterStatus, sortKey, sortDir])
+  }, [clients, search, filterStatus, filterTag, filterGroup, sortKey, sortDir])
 
   function toggleSort(key: typeof sortKey) {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortKey(key); setSortDir('desc') }
   }
-
   function sortIndicator(key: typeof sortKey) {
     if (sortKey !== key) return ' ↕'
     return sortDir === 'asc' ? ' ▲' : ' ▼'
@@ -388,15 +609,17 @@ export default function ClientsPage() {
 
   const chartData = buildGrowthData(clients, chartView)
 
+  /* ── 9 Stat Cards ── */
   const STAT_CARDS = [
-    { key: 'total', label: 'Total Clients', value: clients.length, prefix: '', decimals: 0, color: '#6366f1', icon: '👥' },
-    { key: 'active', label: 'Active Clients', value: activeClients, prefix: '', decimals: 0, color: '#10b981', icon: '✅' },
-    { key: 'inactive', label: 'Inactive / Leads', value: inactiveClients, prefix: '', decimals: 0, color: '#f59e0b', icon: '💤' },
-    { key: 'revenue', label: 'Total Revenue', value: totalRevenue, prefix: '$', decimals: 2, color: '#10b981', icon: '💰' },
-    { key: 'outstanding', label: 'Outstanding Balance', value: outstanding, prefix: '$', decimals: 2, color: outstanding > 0 ? '#f59e0b' : '#10b981', icon: '⏳' },
-    { key: 'avg', label: 'Avg Client Value', value: avgValue, prefix: '$', decimals: 2, color: '#0ea5e9', icon: '📊' },
-    { key: 'new', label: 'New This Month', value: newThisMonth, prefix: '', decimals: 0, color: '#8b5cf6', icon: '🆕' },
-    { key: 'repeat', label: 'Repeat Clients', value: repeatClients, prefix: '', decimals: 0, color: '#ec4899', icon: '🔄' },
+    { key: 'total',       label: 'Total Clients',       value: clients.length, prefix: '',  decimals: 0, color: '#6366f1',                              icon: '👥' },
+    { key: 'active',      label: 'Active Clients',       value: activeClients,  prefix: '',  decimals: 0, color: '#10b981',                              icon: '✅' },
+    { key: 'inactive',    label: 'Inactive / Leads',     value: inactiveClients,prefix: '',  decimals: 0, color: '#f59e0b',                              icon: '💤' },
+    { key: 'revenue',     label: 'Total Revenue',        value: totalRevenue,   prefix: '$', decimals: 2, color: '#10b981',                              icon: '💰' },
+    { key: 'outstanding', label: 'Outstanding',          value: outstanding,    prefix: '$', decimals: 2, color: outstanding > 0 ? '#f59e0b' : '#10b981', icon: '⏳' },
+    { key: 'avg',         label: 'Avg Client Value',     value: avgValue,       prefix: '$', decimals: 2, color: '#0ea5e9',                              icon: '📊' },
+    { key: 'repeat',      label: 'Repeat Clients',       value: repeatClients,  prefix: '',  decimals: 0, color: '#ec4899',                              icon: '🔄' },
+    { key: 'atRisk',      label: 'At-Risk Clients',      value: atRiskClients,  prefix: '',  decimals: 0, color: atRiskClients > 0 ? '#ef4444' : 'var(--mu)', icon: '🚨' },
+    { key: 'new',         label: 'New This Month',       value: newThisMonth,   prefix: '',  decimals: 0, color: '#8b5cf6',                              icon: '🆕' },
   ]
 
   const FILTER_PILLS = [
@@ -414,8 +637,8 @@ export default function ClientsPage() {
     return (
       <div className="page-content">
         <div style={{ height: 44, width: 280, marginBottom: 28 }} className="skeleton" />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 24 }}>
-          {[...Array(8)].map((_, i) => <div key={i} style={{ height: 90 }} className="skeleton" />)}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 24 }}>
+          {[...Array(9)].map((_, i) => <div key={i} style={{ height: 90 }} className="skeleton" />)}
         </div>
         <div style={{ height: 300 }} className="skeleton" />
       </div>
@@ -429,116 +652,133 @@ export default function ClientsPage() {
         {/* ── Header ── */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28, flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <h1 className="page-title">Clients</h1>
+            <h1 className="page-title">Clients{showArchived ? ' — Archived' : ''}</h1>
             <p style={{ color: 'var(--mu)', fontSize: 13, marginTop: 4 }}>Your most valuable relationships.</p>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button className="btn-primary" onClick={() => setDrawerOpen(true)}>+ Add Client</button>
+            {!showArchived && <button className="btn-primary" onClick={() => setDrawerOpen(true)}>+ Add Client</button>}
             <button className="btn-ghost" onClick={() => router.push('/invoices')}>Create Invoice</button>
-            <button className="btn-ghost" onClick={() => toast('Estimate builder coming soon 🚀')}>Create Estimate</button>
-            <button className="btn-ghost" onClick={exportClients}>Export Clients</button>
-            <button className="btn-ghost" onClick={() => toast('Import coming soon 🚀')}>Import Clients</button>
+            <button className="btn-ghost" onClick={() => setShowArchived(s => !s)}>{showArchived ? '← Active' : '📁 Archived'}</button>
+            <button className="btn-ghost" onClick={exportClients}>Export</button>
+            <button className="btn-ghost" onClick={() => setLearnOpen(true)}>? Learn</button>
           </div>
         </div>
 
-        {clients.length === 0 ? (
-          <EmptyState onAdd={() => setDrawerOpen(true)} />
-        ) : (
+        {/* ── Empty states ── */}
+        {clients.length === 0 && !showArchived && (
+          <EmptyState onAdd={() => setDrawerOpen(true)} onLearn={() => setLearnOpen(true)} />
+        )}
+
+        {clients.length === 0 && showArchived && (
+          <div style={{ textAlign: 'center', padding: '80px 24px', color: 'var(--mu)' }}>
+            <p style={{ fontSize: 40, marginBottom: 14 }}>📭</p>
+            <h3 style={{ fontWeight: 800, fontSize: 17, color: 'var(--ink)', marginBottom: 8 }}>No archived clients</h3>
+            <p style={{ fontSize: 13 }}>Archived clients will appear here.</p>
+            <button className="btn-ghost" style={{ marginTop: 16 }} onClick={() => setShowArchived(false)}>← Back to active</button>
+          </div>
+        )}
+
+        {clients.length > 0 && (
           <>
-            {/* ── 8 Stat Cards ── */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 24 }}>
-              {STAT_CARDS.map((s, i) => (
-                <motion.div key={s.key} className="stat-card" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05, duration: 0.35 }}
-                  style={{ position: 'relative' }}
-                  onMouseEnter={() => setHoveredStat(s.key)}
-                  onMouseLeave={() => setHoveredStat(null)}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <span style={{ fontSize: 18 }}>{s.icon}</span>
-                    <span style={{ fontSize: 13, cursor: 'help', opacity: 0.5 }}>ℹ️</span>
+            {/* ── 9 Stat Cards (3-col grid) ── */}
+            {!showArchived && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 24 }}>
+                {STAT_CARDS.map((s, i) => (
+                  <motion.div key={s.key} className="stat-card"
+                    initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04, duration: 0.35 }}
+                    style={{ position: 'relative' }}
+                    onMouseEnter={() => setHoveredStat(s.key)}
+                    onMouseLeave={() => setHoveredStat(null)}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span style={{ fontSize: 18 }}>{s.icon}</span>
+                      <span style={{ fontSize: 13, cursor: 'help', opacity: 0.5 }}>ℹ️</span>
+                    </div>
+                    <div className="stat-label">{s.label}</div>
+                    <div className="stat-value" style={{ color: s.color, fontSize: 20 }}>
+                      {s.prefix}<CountUp end={s.value} decimals={s.decimals} duration={1.2} separator="," />
+                    </div>
+                    {hoveredStat === s.key && STAT_TOOLTIPS[s.key] && (
+                      <div style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: 8, width: 200, background: 'var(--bg2)', border: '1px solid var(--bd2)', borderRadius: 10, padding: '10px 12px', fontSize: 11, color: 'var(--ink)', lineHeight: 1.6, zIndex: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.2)', pointerEvents: 'none' }}>
+                        {STAT_TOOLTIPS[s.key]}
+                      </div>
+                    )}
+                  </motion.div>
+                ))}
+              </div>
+            )}
+
+            {/* ── Growth Chart + Top Clients ── */}
+            {!showArchived && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 20, marginBottom: 20 }}>
+                <motion.div className="glass-card" style={{ padding: 24 }} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.38 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                    <h2 style={{ fontWeight: 900, fontSize: 15, color: 'var(--ink)', letterSpacing: '-0.03em' }}>Client Growth</h2>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {(['monthly', 'quarterly', 'yearly'] as const).map(v => (
+                        <button key={v} onClick={() => setChartView(v)} style={{ padding: '4px 10px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 10, fontWeight: 700, background: chartView === v ? '#6366f1' : 'var(--bg3)', color: chartView === v ? '#fff' : 'var(--mu)', transition: 'all 0.15s' }}>
+                          {v.charAt(0).toUpperCase() + v.slice(1)}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <div className="stat-label">{s.label}</div>
-                  <div className="stat-value" style={{ color: s.color, fontSize: 20 }}>
-                    {s.prefix}<CountUp end={s.value} decimals={s.decimals} duration={1.2} separator="," />
-                  </div>
-                  {hoveredStat === s.key && (
-                    <div style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: 8, width: 200, background: 'var(--bg2)', border: '1px solid var(--bd2)', borderRadius: 10, padding: '10px 12px', fontSize: 11, color: 'var(--ink)', lineHeight: 1.6, zIndex: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.2)', pointerEvents: 'none' }}>
-                      {STAT_TOOLTIPS[s.key]}
+                  {chartData.length === 0 ? (
+                    <div style={{ height: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--mu)' }}>
+                      <span style={{ fontSize: 32, marginBottom: 10 }}>📈</span>
+                      <p style={{ fontSize: 13, fontWeight: 600 }}>Add more clients to see growth trends</p>
+                      <p style={{ fontSize: 11, marginTop: 4 }}>Chart appears across multiple time periods</p>
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={200}>
+                      <LineChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--bd)" vertical={false} />
+                        <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--mu)' }} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--mu)' }} allowDecimals={false} />
+                        <Tooltip content={<ChartTip />} />
+                        <Line type="monotone" dataKey="count" name="New Clients" stroke="#6366f1" strokeWidth={2.5} dot={{ fill: '#6366f1', r: 4 }} activeDot={{ r: 6 }} animationDuration={700} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  )}
+                </motion.div>
+
+                <motion.div className="glass-card" style={{ padding: 20 }} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.43 }}>
+                  <h2 style={{ fontWeight: 900, fontSize: 15, color: 'var(--ink)', letterSpacing: '-0.03em', marginBottom: 16 }}>Top Clients</h2>
+                  {top5.length === 0 ? (
+                    <p style={{ fontSize: 12, color: 'var(--mu)', textAlign: 'center', padding: '40px 0' }}>No revenue data yet</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      {top5.map(c => {
+                        const bal = Number(c.total_billed) - Number(c.total_paid)
+                        const barW = maxBilled > 0 ? (Number(c.total_billed) / Number(maxBilled)) * 100 : 0
+                        return (
+                          <button key={c.id} onClick={() => router.push(`/clients/${c.id}`)}
+                            style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: '6px 8px', borderRadius: 10, transition: 'background 0.15s' }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg3)' }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none' }}>
+                            <div style={{ width: 32, height: 32, borderRadius: 9, background: c.avatar_color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <span style={{ color: '#fff', fontSize: 11, fontWeight: 800 }}>{initials(c.name)}</span>
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <p style={{ fontWeight: 600, fontSize: 12, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }}>{c.name}</p>
+                              <div className="progress-track" style={{ height: 5 }}>
+                                <div className="progress-fill" style={{ width: `${barW}%`, background: c.avatar_color, transition: 'width 0.8s ease' }} />
+                              </div>
+                            </div>
+                            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                              <p style={{ fontWeight: 700, fontSize: 12, color: 'var(--ink)', fontFamily: "DM Mono, monospace" }}>${Number(c.total_billed).toFixed(0)}</p>
+                              {bal > 0 && <p style={{ fontSize: 9, color: '#f59e0b', fontWeight: 700 }}>+${bal.toFixed(0)} owed</p>}
+                            </div>
+                          </button>
+                        )
+                      })}
                     </div>
                   )}
                 </motion.div>
-              ))}
-            </div>
-
-            {/* ── Growth Chart + Top Clients ── */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 20, marginBottom: 20 }}>
-              <motion.div className="glass-card" style={{ padding: 24 }} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-                  <h2 style={{ fontWeight: 900, fontSize: 15, color: 'var(--ink)', letterSpacing: '-0.03em' }}>Client Growth</h2>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    {(['monthly','quarterly','yearly'] as const).map(v => (
-                      <button key={v} onClick={() => setChartView(v)} style={{ padding: '4px 10px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 10, fontWeight: 700, background: chartView === v ? '#6366f1' : 'var(--bg3)', color: chartView === v ? '#fff' : 'var(--mu)', transition: 'all 0.15s' }}>
-                        {v.charAt(0).toUpperCase() + v.slice(1)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {chartData.length === 0 ? (
-                  <div style={{ height: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--mu)' }}>
-                    <span style={{ fontSize: 32, marginBottom: 10 }}>📈</span>
-                    <p style={{ fontSize: 13, fontWeight: 600 }}>Add more clients to see growth trends</p>
-                    <p style={{ fontSize: 11, marginTop: 4 }}>Chart appears when you have clients over multiple periods</p>
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={200}>
-                    <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--bd)" vertical={false} />
-                      <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--mu)' }} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--mu)' }} allowDecimals={false} />
-                      <Tooltip content={<ChartTip />} />
-                      <Line type="monotone" dataKey="count" name="New Clients" stroke="#6366f1" strokeWidth={2.5} dot={{ fill: '#6366f1', r: 4 }} activeDot={{ r: 6 }} animationDuration={700} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                )}
-              </motion.div>
-
-              <motion.div className="glass-card" style={{ padding: 20 }} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-                <h2 style={{ fontWeight: 900, fontSize: 15, color: 'var(--ink)', letterSpacing: '-0.03em', marginBottom: 16 }}>Top Clients</h2>
-                {top5.length === 0 ? (
-                  <p style={{ fontSize: 12, color: 'var(--mu)', textAlign: 'center', padding: '40px 0' }}>No revenue data yet</p>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {top5.map(c => {
-                      const bal = Number(c.total_billed) - Number(c.total_paid)
-                      const barW = maxBilled > 0 ? (Number(c.total_billed) / Number(maxBilled)) * 100 : 0
-                      return (
-                        <button key={c.id} onClick={() => router.push(`/clients/${c.id}`)}
-                          style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: '6px 8px', borderRadius: 10, transition: 'background 0.15s' }}
-                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg3)' }}
-                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none' }}>
-                          <div style={{ width: 32, height: 32, borderRadius: 9, background: c.avatar_color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            <span style={{ color: '#fff', fontSize: 11, fontWeight: 800 }}>{initials(c.name)}</span>
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <p style={{ fontWeight: 600, fontSize: 12, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }}>{c.name}</p>
-                            <div className="progress-track" style={{ height: 5 }}>
-                              <div className="progress-fill" style={{ width: `${barW}%`, background: c.avatar_color, transition: 'width 0.8s ease' }} />
-                            </div>
-                          </div>
-                          <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                            <p style={{ fontWeight: 700, fontSize: 12, color: 'var(--ink)', fontFamily: `DM Mono, monospace` }}>${Number(c.total_billed).toFixed(0)}</p>
-                            {bal > 0 && <p style={{ fontSize: 9, color: '#f59e0b', fontWeight: 700 }}>+${bal.toFixed(0)} owed</p>}
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
-              </motion.div>
-            </div>
+              </div>
+            )}
 
             {/* ── Smart Insights ── */}
-            {insights.length > 0 && (
-              <motion.div className="glass-card" style={{ padding: 20, marginBottom: 20 }} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}>
+            {!showArchived && insights.length > 0 && (
+              <motion.div className="glass-card" style={{ padding: 20, marginBottom: 20 }} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.48 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                   <h2 style={{ fontWeight: 900, fontSize: 15, color: 'var(--ink)', letterSpacing: '-0.03em' }}>Smart Insights</h2>
                   <div className="live-dot" />
@@ -560,97 +800,196 @@ export default function ClientsPage() {
             )}
 
             {/* ── Table ── */}
-            <motion.div className="glass-card" style={{ padding: 0, overflow: 'hidden' }} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
+            <motion.div className="glass-card" style={{ padding: 0, overflow: 'hidden' }} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.52 }}>
               {/* Controls */}
-              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--bd)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                <input className="input" style={{ maxWidth: 240, height: 36 }} placeholder="🔍 Search clients..." value={search} onChange={e => setSearch(e.target.value)} />
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1 }}>
-                  {FILTER_PILLS.map(f => (
-                    <button key={f.key} onClick={() => setFilterStatus(f.key)}
-                      style={{ padding: '5px 12px', borderRadius: 99, fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer', transition: 'all 0.15s', background: filterStatus === f.key ? '#6366f1' : 'var(--bg3)', color: filterStatus === f.key ? '#fff' : 'var(--mu)' }}>
-                      {f.label}
-                    </button>
-                  ))}
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--bd)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <input className="input" style={{ maxWidth: 240, height: 36 }} placeholder="🔍 Search clients..." value={search} onChange={e => setSearch(e.target.value)} />
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1 }}>
+                    {FILTER_PILLS.map(f => (
+                      <button key={f.key} onClick={() => setFilterStatus(f.key)}
+                        style={{ padding: '5px 12px', borderRadius: 99, fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer', transition: 'all 0.15s', background: filterStatus === f.key ? '#6366f1' : 'var(--bg3)', color: filterStatus === f.key ? '#fff' : 'var(--mu)' }}>
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                  <span style={{ fontSize: 11, color: 'var(--mu)', whiteSpace: 'nowrap' }}>{filtered.length} client{filtered.length !== 1 ? 's' : ''}</span>
                 </div>
-                <span style={{ fontSize: 11, color: 'var(--mu)', whiteSpace: 'nowrap' }}>{filtered.length} clients</span>
+
+                {/* Tag + Group secondary filters */}
+                {(allTags.length > 0 || allGroups.length > 0) && (
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', paddingTop: 4 }}>
+                    {allTags.length > 0 && (
+                      <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--mu2)' }}>Tag</span>
+                        <button onClick={() => setFilterTag(null)}
+                          style={{ padding: '3px 9px', borderRadius: 99, fontSize: 10, fontWeight: 700, border: 'none', cursor: 'pointer', background: filterTag === null ? 'rgba(99,102,241,0.15)' : 'var(--bg3)', color: filterTag === null ? '#6366f1' : 'var(--mu)' }}>
+                          All
+                        </button>
+                        {allTags.map(t => (
+                          <button key={t} onClick={() => setFilterTag(filterTag === t ? null : t)}
+                            style={{ padding: '3px 9px', borderRadius: 99, fontSize: 10, fontWeight: 700, border: 'none', cursor: 'pointer', background: filterTag === t ? 'rgba(99,102,241,0.15)' : 'var(--bg3)', color: filterTag === t ? '#6366f1' : 'var(--mu)' }}>
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {allGroups.length > 0 && (
+                      <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--mu2)' }}>Group</span>
+                        <button onClick={() => setFilterGroup(null)}
+                          style={{ padding: '3px 9px', borderRadius: 99, fontSize: 10, fontWeight: 700, border: 'none', cursor: 'pointer', background: filterGroup === null ? 'rgba(16,185,129,0.15)' : 'var(--bg3)', color: filterGroup === null ? '#10b981' : 'var(--mu)' }}>
+                          All
+                        </button>
+                        {allGroups.map(g => (
+                          <button key={g} onClick={() => setFilterGroup(filterGroup === g ? null : g)}
+                            style={{ padding: '3px 9px', borderRadius: 99, fontSize: 10, fontWeight: 700, border: 'none', cursor: 'pointer', background: filterGroup === g ? 'rgba(16,185,129,0.15)' : 'var(--bg3)', color: filterGroup === g ? '#10b981' : 'var(--mu)' }}>
+                            {g}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
-              {/* Table */}
+              {/* Empty filter result */}
               {filtered.length === 0 ? (
-                <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--mu)' }}>
-                  <p style={{ fontSize: 14, fontWeight: 600 }}>No clients match your search</p>
-                  <p style={{ fontSize: 12, marginTop: 4 }}>Try adjusting your filters</p>
+                <div style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--mu)' }}>
+                  <p style={{ fontSize: 28, marginBottom: 10 }}>🔍</p>
+                  <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)', marginBottom: 4 }}>No clients match your filters</p>
+                  <p style={{ fontSize: 12 }}>Try adjusting the search or filter options</p>
+                  <button className="btn-ghost" style={{ marginTop: 16, fontSize: 11 }}
+                    onClick={() => { setSearch(''); setFilterStatus('all'); setFilterTag(null); setFilterGroup(null) }}>
+                    Clear all filters
+                  </button>
                 </div>
               ) : (
-                <div style={{ overflowX: 'auto' }}>
-                  <table className="table-base" style={{ minWidth: 800 }}>
-                    <thead>
-                      <tr>
-                        <th style={{ paddingLeft: 20 }}>
-                          <button onClick={() => toggleSort('name')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.09em', color: 'var(--mu2)' }}>
-                            Client{sortIndicator('name')}
-                          </button>
-                        </th>
-                        <th>Company</th>
-                        <th>Email</th>
-                        <th>Status</th>
-                        <th>
-                          <button onClick={() => toggleSort('revenue')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.09em', color: 'var(--mu2)' }}>
-                            Revenue{sortIndicator('revenue')}
-                          </button>
-                        </th>
-                        <th>
-                          <button onClick={() => toggleSort('balance')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.09em', color: 'var(--mu2)' }}>
-                            Outstanding{sortIndicator('balance')}
-                          </button>
-                        </th>
-                        <th>
-                          <button onClick={() => toggleSort('created_at')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.09em', color: 'var(--mu2)' }}>
-                            Client Since{sortIndicator('created_at')}
-                          </button>
-                        </th>
-                        <th style={{ paddingRight: 20, textAlign: 'right' }}>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filtered.map(c => {
-                        const bal = Math.max(0, Number(c.total_billed) - Number(c.total_paid))
-                        return (
-                          <tr key={c.id} onClick={() => router.push(`/clients/${c.id}`)} style={{ cursor: 'pointer' }}>
-                            <td style={{ paddingLeft: 20 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                <div style={{ width: 32, height: 32, borderRadius: 9, background: c.avatar_color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                  <span style={{ color: '#fff', fontSize: 10, fontWeight: 800 }}>{initials(c.name)}</span>
-                                </div>
-                                <div>
-                                  <p style={{ fontWeight: 600, fontSize: 13 }}>{c.name}</p>
-                                  {(c.tags ?? []).length > 0 && (
-                                    <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
+                <>
+                  {/* Desktop table */}
+                  <div className="mobile-table-hide" style={{ overflowX: 'auto' }}>
+                    <table className="table-base" style={{ minWidth: 900 }}>
+                      <thead>
+                        <tr>
+                          <th style={{ paddingLeft: 20 }}>
+                            <button onClick={() => toggleSort('name')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.09em', color: 'var(--mu2)' }}>
+                              Client{sortIndicator('name')}
+                            </button>
+                          </th>
+                          <th>Company</th>
+                          <th>Status</th>
+                          <th>
+                            <button onClick={() => toggleSort('revenue')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.09em', color: 'var(--mu2)' }}>
+                              Revenue{sortIndicator('revenue')}
+                            </button>
+                          </th>
+                          <th>
+                            <button onClick={() => toggleSort('balance')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.09em', color: 'var(--mu2)' }}>
+                              Outstanding{sortIndicator('balance')}
+                            </button>
+                          </th>
+                          <th>
+                            <button onClick={() => toggleSort('created_at')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.09em', color: 'var(--mu2)' }}>
+                              Since{sortIndicator('created_at')}
+                            </button>
+                          </th>
+                          <th style={{ paddingRight: 16, textAlign: 'right' }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filtered.map(c => {
+                          const bal = Math.max(0, Number(c.total_billed) - Number(c.total_paid))
+                          return (
+                            <tr key={c.id} onClick={() => router.push(`/clients/${c.id}`)} style={{ cursor: 'pointer' }}>
+                              <td style={{ paddingLeft: 20 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                  <div style={{ width: 32, height: 32, borderRadius: 9, background: c.avatar_color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                    <span style={{ color: '#fff', fontSize: 10, fontWeight: 800 }}>{initials(c.name)}</span>
+                                  </div>
+                                  <div>
+                                    <p style={{ fontWeight: 600, fontSize: 13 }}>{c.name}</p>
+                                    <div style={{ display: 'flex', gap: 4, marginTop: 2, flexWrap: 'wrap' }}>
                                       {(c.tags ?? []).slice(0, 2).map(t => (
                                         <span key={t} style={{ fontSize: 9, padding: '1px 6px', borderRadius: 99, background: 'rgba(99,102,241,0.12)', color: '#6366f1', fontWeight: 700 }}>{t}</span>
                                       ))}
+                                      {(c.tags ?? []).length > 2 && <span style={{ fontSize: 9, color: 'var(--mu2)' }}>+{(c.tags ?? []).length - 2}</span>}
+                                      {c.client_group && (
+                                        <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 99, background: 'rgba(16,185,129,0.12)', color: '#10b981', fontWeight: 700 }}>{c.client_group}</span>
+                                      )}
                                     </div>
-                                  )}
+                                  </div>
                                 </div>
-                              </div>
-                            </td>
-                            <td style={{ color: 'var(--mu)', fontSize: 12 }}>{c.company || '—'}</td>
-                            <td style={{ color: 'var(--mu)', fontSize: 12 }}>{c.email || '—'}</td>
-                            <td><span className={`status-pill ${STATUS_MAP[c.status] ?? 'status-draft'}`}>{c.status}</span></td>
-                            <td style={{ fontFamily: `DM Mono, monospace`, fontSize: 12, fontWeight: 600, color: '#10b981' }}>${Number(c.total_billed).toFixed(2)}</td>
-                            <td style={{ fontFamily: `DM Mono, monospace`, fontSize: 12, fontWeight: 600, color: bal > 0 ? '#f59e0b' : 'var(--mu)' }}>
-                              {bal > 0 ? `$${bal.toFixed(2)}` : '—'}
-                            </td>
-                            <td style={{ color: 'var(--mu)', fontSize: 12 }}>{new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
-                            <td style={{ paddingRight: 20, textAlign: 'right' }} onClick={e => e.stopPropagation()}>
-                              <button onClick={() => router.push(`/clients/${c.id}`)} className="btn-ghost" style={{ padding: '5px 12px', fontSize: 11 }}>View →</button>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                              </td>
+                              <td style={{ color: 'var(--mu)', fontSize: 12 }}>{c.company || '—'}</td>
+                              <td><span className={`status-pill ${STATUS_MAP[c.status] ?? 'status-draft'}`}>{c.status}</span></td>
+                              <td style={{ fontFamily: "DM Mono, monospace", fontSize: 12, fontWeight: 600, color: '#10b981' }}>${Number(c.total_billed).toFixed(2)}</td>
+                              <td style={{ fontFamily: "DM Mono, monospace", fontSize: 12, fontWeight: 600, color: bal > 0 ? '#f59e0b' : 'var(--mu)' }}>
+                                {bal > 0 ? `$${bal.toFixed(2)}` : '—'}
+                              </td>
+                              <td style={{ color: 'var(--mu)', fontSize: 12 }}>{new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+                              <td style={{ paddingRight: 12, textAlign: 'right' }} onClick={e => e.stopPropagation()}>
+                                <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                                  {c.email && (
+                                    <button onClick={e => emailClient(c, e)} className="btn-ghost" title={`Email ${c.email}`}
+                                      style={{ padding: '4px 8px', fontSize: 11 }}>✉️</button>
+                                  )}
+                                  <button onClick={e => { e.stopPropagation(); setEditClient(c) }} className="btn-ghost"
+                                    style={{ padding: '4px 9px', fontSize: 11 }}>Edit</button>
+                                  <button onClick={e => { e.stopPropagation(); router.push(`/invoices?client=${encodeURIComponent(c.name)}`) }}
+                                    className="btn-ghost" style={{ padding: '4px 9px', fontSize: 11 }}>Invoice</button>
+                                  {c.archived_at ? (
+                                    <button onClick={e => restoreClient(c, e)} className="btn-ghost"
+                                      style={{ padding: '4px 9px', fontSize: 11, color: '#10b981' }}>Restore</button>
+                                  ) : (
+                                    <button onClick={e => archiveClient(c, e)} className="btn-ghost"
+                                      style={{ padding: '4px 9px', fontSize: 11 }}>Archive</button>
+                                  )}
+                                  <button onClick={e => deleteClient(c, e)} className="btn-ghost"
+                                    style={{ padding: '4px 9px', fontSize: 11, color: '#ef4444' }}>Del</button>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile cards */}
+                  <div className="mobile-cards">
+                    {filtered.map(c => {
+                      const bal = Math.max(0, Number(c.total_billed) - Number(c.total_paid))
+                      return (
+                        <div key={c.id} className="mobile-card" onClick={() => router.push(`/clients/${c.id}`)} style={{ cursor: 'pointer' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <div style={{ width: 40, height: 40, borderRadius: 11, background: c.avatar_color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <span style={{ color: '#fff', fontSize: 13, fontWeight: 800 }}>{initials(c.name)}</span>
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <p style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</p>
+                              <p style={{ fontSize: 12, color: 'var(--mu)', marginTop: 1 }}>{c.company || c.email || '—'}</p>
+                            </div>
+                            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                              <p style={{ fontFamily: "DM Mono, monospace", fontWeight: 700, fontSize: 13, color: '#10b981' }}>${Number(c.total_billed).toFixed(0)}</p>
+                              {bal > 0 && <p style={{ fontSize: 11, color: '#f59e0b', fontWeight: 700, marginTop: 2 }}>+${bal.toFixed(0)} owed</p>}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
+                            <span className={`status-pill ${STATUS_MAP[c.status] ?? 'status-draft'}`}>{c.status}</span>
+                            <div style={{ display: 'flex', gap: 5 }} onClick={e => e.stopPropagation()}>
+                              {c.email && <button onClick={e => emailClient(c, e)} className="btn-ghost" style={{ padding: '3px 8px', fontSize: 10 }}>✉️</button>}
+                              {c.archived_at ? (
+                                <button onClick={e => restoreClient(c, e)} className="btn-ghost" style={{ padding: '3px 8px', fontSize: 10, color: '#10b981' }}>Restore</button>
+                              ) : (
+                                <button onClick={e => archiveClient(c, e)} className="btn-ghost" style={{ padding: '3px 8px', fontSize: 10 }}>Archive</button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
               )}
             </motion.div>
           </>
@@ -662,11 +1001,23 @@ export default function ClientsPage() {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         colorIndex={clients.length}
-        onSaved={c => {
-          setClients(prev => [c, ...prev])
-          setDrawerOpen(false)
+        onSaved={c => { setClients(prev => [c, ...prev]); setDrawerOpen(false) }}
+      />
+
+      {/* ── Edit Client Drawer ── */}
+      <ClientDrawer
+        open={!!editClient}
+        onClose={() => setEditClient(null)}
+        colorIndex={0}
+        initial={editClient ?? undefined}
+        onSaved={updated => {
+          setClients(prev => prev.map(c => c.id === updated.id ? updated : c))
+          setEditClient(null)
         }}
       />
+
+      {/* ── Learn Panel ── */}
+      <LearnPanel open={learnOpen} onClose={() => setLearnOpen(false)} />
     </div>
   )
 }

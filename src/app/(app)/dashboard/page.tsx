@@ -366,7 +366,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ── KPI Cards (8) with ⓘ info icons ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 24 }}>
+        <div className="dash-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 24 }}>
           {KPI_CARDS.map((k, i) => {
             const pct = Math.min(100, (k.value / k.goal) * 100)
             const expanded = expandedKpi === k.key
@@ -410,7 +410,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Charts + Business Insights row ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20, marginBottom: 20 }}>
+        <div className="dash-chart-row" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20, marginBottom: 20 }}>
 
           {/* Revenue vs Expenses */}
           <motion.div className="glass-card" style={{ padding: 24 }} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5, duration: 0.4 }}>
@@ -479,7 +479,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Cash Flow + Can I Afford This? + Forecast ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr', gap: 20, marginBottom: 20 }}>
+        <div className="dash-cashflow-row" style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr', gap: 20, marginBottom: 20 }}>
 
           {/* Cash Flow */}
           <motion.div className="glass-card" style={{ padding: 24 }} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.4 }}>
@@ -600,7 +600,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Goals + Health + Checklist row ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, marginBottom: 20 }}>
+        <div className="dash-goals-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, marginBottom: 20 }}>
 
           {/* Monthly Goals */}
           <motion.div className="glass-card" style={{ padding: 20 }} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.75, duration: 0.4 }}>
@@ -689,7 +689,7 @@ export default function DashboardPage() {
         {/* ── Connected Apps ── */}
         <motion.div className="glass-card" style={{ padding: 20 }} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.9, duration: 0.4 }}>
           <h2 style={{ fontWeight: 900, fontSize: 15, color: 'var(--ink)', letterSpacing: '-0.03em', marginBottom: 16 }}>Connected Apps</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 12 }}>
+          <div className="dash-apps-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 12 }}>
             {CONNECTED_APPS.map(app => (
               <button key={app.name} onClick={() => {
                 if (app.status === 'connected') toast.success(`${app.name} connected ✓`, { icon: '✅' })

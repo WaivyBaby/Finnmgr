@@ -170,6 +170,7 @@ function LearnPanel({ label, onClose }: { label: string; onClose: () => void }) 
     <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
       transition={{ type: 'spring', damping: 30, stiffness: 280 }}
       role="dialog" aria-modal="true" aria-label={label}
+      className="side-drawer-panel"
       style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 360, background: 'var(--bg2)', borderLeft: '1px solid var(--bd2)', zIndex: 850, display: 'flex', flexDirection: 'column', boxShadow: '-20px 0 60px rgba(0,0,0,0.3)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px', borderBottom: '1px solid var(--bd)' }}>
         <h3 style={{ fontWeight: 900, fontSize: '1rem', color: 'var(--ink)', letterSpacing: '-0.03em' }}>{label}</h3>
@@ -897,7 +898,8 @@ export default function InvoicesPage() {
         {/* ── TABLE VIEW ── */}
         {view === 'table' && filtered.length > 0 && (
           <motion.div className="glass-card" style={{ padding: 0, overflow: 'hidden' }} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-            <div style={{ overflowX: 'auto' }}>
+            {/* Desktop table */}
+            <div className="mobile-table-hide" style={{ overflowX: 'auto' }}>
               <table className="table-base" style={{ minWidth: 900 }}>
                 <thead>
                   <tr>
@@ -949,6 +951,40 @@ export default function InvoicesPage() {
                   })}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile card list */}
+            <div className="mobile-cards">
+              {filtered.map(inv => {
+                const total = getTotal(inv)
+                const balance = getBalance(inv)
+                const days = inv.status === 'overdue' ? daysPast(inv.due_date) : 0
+                return (
+                  <div key={inv.id} className="mobile-card" onClick={() => router.push(`/invoices/${inv.id}`)} style={{ cursor: 'pointer' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#6366f1', fontWeight: 700, marginBottom: 2 }}>{inv.invoice_number}</p>
+                        <p style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>{inv.client_name}</p>
+                        <p style={{ fontSize: 11, color: 'var(--mu)', marginTop: 1 }}>Due {format(new Date(inv.due_date), 'MMM d, yyyy')}</p>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <p style={{ fontFamily: 'DM Mono, monospace', fontWeight: 800, fontSize: 15, color: 'var(--ink)' }}>${total.toFixed(2)}</p>
+                        {balance > 0 && <p style={{ fontSize: 11, color: '#f59e0b', fontWeight: 700, marginTop: 2 }}>${balance.toFixed(2)} due</p>}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <StatusBadge status={inv.status} />
+                        {days > 0 && <span style={{ fontSize: 11, color: '#ef4444', fontWeight: 700 }}>{days}d overdue</span>}
+                      </div>
+                      <div style={{ display: 'flex', gap: 6 }} onClick={e => e.stopPropagation()}>
+                        <button onClick={() => openEdit(inv)} className="btn-ghost" style={{ padding: '4px 10px', fontSize: 11 }}>Edit</button>
+                        <button onClick={() => deleteInvoice(inv.id)} style={{ padding: '4px 10px', fontSize: 11, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, cursor: 'pointer', color: '#ef4444' }}>Delete</button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </motion.div>
         )}
