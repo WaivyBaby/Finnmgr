@@ -30,7 +30,7 @@ const LEARN: Record<string, { title: string; def: string; matters: string; examp
   cashIn:         { title: 'Cash In',          def: 'Cash In is the total money your business received during a period — from clients, sales, or any other income source.',       matters: 'Tracking Cash In shows exactly how much money your business generates. Without it you cannot know if you are growing or shrinking.',                                                 example: 'You received $3,000 from a client project and $500 from a product sale. Cash In = $3,500.',                                            next: 'Record every income payment in the Income module immediately, even small ones.' },
   cashOut:        { title: 'Cash Out',          def: 'Cash Out is the total money your business spent during a period — on software, contractors, rent, or any expense.',          matters: 'Knowing Cash Out helps you identify where money goes and spot opportunities to cut costs.',                                                                                      example: 'You spent $200 on software, $500 on advertising, $100 on supplies. Cash Out = $800.',                                                   next: 'Log every expense immediately. Consistency creates the data you need to forecast.' },
   netCashFlow:    { title: 'Net Cash Flow',     def: 'Net Cash Flow is Cash In minus Cash Out. Positive = you earned more than spent. Negative = opposite.',                      matters: 'Net Cash Flow is the most important business number. Consistently negative means you are losing money faster than making it.',                                                    example: 'Cash In $5,000, Cash Out $3,200 → Net Cash Flow +$1,800. That is $1,800 added to your business.',                                      next: 'Aim for positive Net Cash Flow every month. If negative, review your largest expenses first.' },
-  runway:         { title: 'Runway',            def: 'Runway is how many months your business can keep operating if income stopped today, based on current savings and spending.', matters: 'Runway gives you time to make changes. 1 month of runway is crisis. 6+ months is freedom to invest and grow.',                                                                  example: 'Net cash $15,000, spending $3,000/mo → 5 months of runway before you run out.',                                                        next: 'Keep at least 3 months of runway. Use the What-If Simulator to see how decisions affect it.' },
+  runway:         { title: 'Runway',            def: 'Runway is how many months your business can keep operating at current burn rate. If you have set a manual cash balance via Connect Bank, it is calculated from that balance plus income minus expenses since that date. Otherwise, it is estimated from total income minus total expenses recorded in FINNMGR — set a real balance for the most accurate reading.', matters: 'Runway gives you time to make changes. 1 month of runway is crisis. 6+ months is freedom to invest and grow.',                                                                  example: 'Manual balance $15,000, spending $3,000/mo → 5 months of runway. Without a balance set, FINNMGR estimates from income minus expenses.',  next: 'Set a real cash balance via Connect Bank. Keep at least 3 months of runway as a buffer.' },
   burnRate:       { title: 'Burn Rate',         def: 'Burn Rate is the average amount your business spends per month, calculated from your last 3 months of expenses.',           matters: 'Your Burn Rate determines your Runway. Reducing it by even 10–20% can add months of safety.',                                                                                  example: 'You spent $2,800, $3,200, $3,000 over 3 months. Burn Rate = $3,000/month.',                                                           next: 'Review your largest expense categories. Even small reductions add up quickly over a year.' },
   collectionRate: { title: 'Collection Rate',   def: 'Collection Rate is the percentage of invoiced money you have actually received. 100% means every invoice was paid.',        matters: 'Low Collection Rate means money sitting in unpaid invoices instead of your bank account. Chasing payments costs time and creates cash gaps.',                                     example: 'You invoiced $10,000, collected $8,500. Collection Rate = 85%. $1,500 is still outstanding.',                                          next: 'Follow up on unpaid invoices at 7, 14, and 30 days. A simple email dramatically improves collections.' },
   forecast:       { title: 'Forecast',          def: 'A Forecast is an educated estimate of your future income and expenses based on historical patterns and current trends.',     matters: 'Forecasting prevents surprises. Knowing what next month looks like lets you prepare and adjust before a crisis happens.',                                                       example: 'You averaged $4,000 income and $2,500 expenses over 3 months → 30-day forecast is roughly +$1,500 net.',                              next: 'Check the 30-day forecast weekly. If it turns negative, investigate immediately.' },
@@ -515,13 +515,8 @@ export default function CashflowPage() {
 
     /* ── Upcoming obligations ── */
     const nowMs    = Date.now()
-    const taxYear  = now.getFullYear()
-    const taxDeadlines = [
-      { date: new Date(taxYear, 3, 15), label: 'Q1 Estimated Tax', amount: 0, type: 'tax' as const },
-      { date: new Date(taxYear, 5, 15), label: 'Q2 Estimated Tax', amount: 0, type: 'tax' as const },
-      { date: new Date(taxYear, 8, 15), label: 'Q3 Estimated Tax', amount: 0, type: 'tax' as const },
-      { date: new Date(taxYear + 1, 0, 15), label: 'Q4 Estimated Tax', amount: 0, type: 'tax' as const },
-    ].filter(d => d.date.getTime() > nowMs).slice(0, 2)
+    // Tax deadlines are not shown here — amounts would be guesses.
+    // Connect the Tax module to display real quarterly deadline data.
 
     const subsObligations = subs.map(s => {
       const lastExp = expenseData.filter(e => e.vendor.toLowerCase().trim() === s.vendor.toLowerCase().trim()).sort((a, b) => b.date.localeCompare(a.date))[0]
@@ -545,7 +540,7 @@ export default function CashflowPage() {
       projMonthEnd, projMonthEndExp, daysElapsed, daysInMonth,
       hs, hlabel, hcolor, leaks,
       topClientMonthly, topClientName,
-      taxDeadlines, subsObligations, invoiceObligations,
+      subsObligations, invoiceObligations,
     }
   }, [incomeData, expenseData, invoiceData, cashBalances])
 
@@ -657,6 +652,18 @@ export default function CashflowPage() {
   const exportSummary  = () => exportCsv(chartData.map(r => ({ month: r.label, income: r.income.toFixed(2), expenses: r.expenses.toFixed(2), net: r.net.toFixed(2) })), 'cashflow_summary.csv')
   const exportSubs     = () => exportCsv(d.subs.map(s => ({ vendor: s.vendor, monthly: s.monthlyAvg.toFixed(2), annual: (s.monthlyAvg * 12).toFixed(2), category: s.cat })), 'subscriptions.csv')
   const exportInvoices = () => exportCsv(d.unpaid.map(i => ({ invoice: i.invoice_number, client: i.client_name, balance: Number(i.balance_due ?? i.total ?? 0).toFixed(2), status: i.status, due: i.due_date || '' })), 'invoice_impact.csv')
+  const exportRunway   = () => exportCsv([
+    { metric: 'Balance source',             value: cashBalances.length > 0 ? `Manual: ${cashBalances[0].account_name} (${cashBalances[0].balance_date})` : 'Estimated (no manual balance set)' },
+    { metric: 'Net cash position',          value: d.netCash.toFixed(2) },
+    { metric: 'Avg monthly expenses (3mo)', value: d.avgExp.toFixed(2) },
+    { metric: 'Avg monthly income (3mo)',   value: d.avgInc.toFixed(2) },
+    { metric: 'Cash runway (months)',       value: d.cashRunway.toFixed(1) },
+    { metric: 'Monthly burn rate',          value: d.avgExp.toFixed(2) },
+    { metric: 'Subscription monthly total', value: d.subMonthlyTotal.toFixed(2) },
+    { metric: 'Outstanding invoices',       value: d.totalOutstanding.toFixed(2) },
+    { metric: 'Health score',               value: String(d.hs) },
+    { metric: 'Health label',               value: d.hlabel },
+  ], 'runway_snapshot.csv')
 
   /* ── Loading ── */
   if (loading) {
@@ -694,10 +701,10 @@ export default function CashflowPage() {
                   <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                     style={{ position: 'absolute', top: '110%', right: 0, width: 210, background: 'var(--bg2)', border: '1px solid var(--bd2)', borderRadius: 14, boxShadow: '0 16px 48px rgba(0,0,0,0.25)', zIndex: 40, padding: 8 }}>
                     {[
-                      { label: 'Cash Flow Summary (CSV)', fn: exportSummary },
-                      { label: 'Subscription Report (CSV)', fn: exportSubs },
-                      { label: 'Invoice Impact (CSV)',    fn: exportInvoices },
-                      { label: 'PDF Report',             fn: () => { toast('PDF coming soon 🚀'); setExportOpen(false) } },
+                      { label: 'Cash Flow Summary (CSV)',  fn: exportSummary },
+                      { label: 'Runway Snapshot (CSV)',    fn: exportRunway },
+                      { label: 'Subscription Report (CSV)',fn: exportSubs },
+                      { label: 'Invoice Impact (CSV)',     fn: exportInvoices },
                     ].map(x => (
                       <button key={x.label} onClick={x.fn}
                         style={{ display: 'block', width: '100%', padding: '9px 12px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--ink)', textAlign: 'left', borderRadius: 8, fontWeight: 500 }}
@@ -744,7 +751,11 @@ export default function CashflowPage() {
                 { key: 'cashIn',         label: 'Cash In',           value: d.thisInc,    prefix: '$', color: '#10b981', icon: '💰', sub: d.incGrowthPct !== 0 ? `${d.incGrowthPct >= 0 ? '▲' : '▼'} ${Math.abs(d.incGrowthPct).toFixed(0)}% vs last mo` : 'This month', subColor: d.incGrowthPct >= 0 ? '#10b981' : '#ef4444', tip: 'Money your business received this month.' },
                 { key: 'cashOut',        label: 'Cash Out',          value: d.thisExp,    prefix: '$', color: '#ff7043', icon: '🧮', sub: d.expGrowthPct !== 0 ? `${d.expGrowthPct >= 0 ? '▲' : '▼'} ${Math.abs(d.expGrowthPct).toFixed(0)}% vs last mo` : 'This month', subColor: d.expGrowthPct <= 0 ? '#10b981' : '#ef4444', tip: 'Money your business spent this month.' },
                 { key: 'netCashFlow',    label: 'Net Cash Flow',     value: d.thisNet,    prefix: '$', color: d.thisNet >= 0 ? '#10b981' : '#ef4444', icon: '📊', sub: d.thisNet >= 0 ? 'Positive ✓' : 'Negative ⚠️', subColor: d.thisNet >= 0 ? '#10b981' : '#ef4444', tip: 'Cash In minus Cash Out. Positive means you earned more than you spent.' },
-                { key: 'runway',         label: 'Runway',            value: d.cashRunway, prefix: '', suffix: ' mo', decimals: 1, color: d.cashRunway > 3 ? '#10b981' : d.cashRunway > 1 ? '#f59e0b' : '#ef4444', icon: '🛣️', sub: `${fmt$(d.avgExp, 0)}/mo burn`, tip: 'How long your business can keep operating if income stopped today.' },
+                { key: 'runway',         label: 'Runway',            value: d.cashRunway, prefix: '', suffix: ' mo', decimals: 1, color: d.cashRunway > 3 ? '#10b981' : d.cashRunway > 1 ? '#f59e0b' : '#ef4444', icon: '🛣️',
+                  sub: cashBalances.length > 0 ? `from ${cashBalances[0].account_name}` : `estimated · ${fmt$(d.avgExp, 0)}/mo burn`,
+                  tip: cashBalances.length > 0
+                    ? `Calculated from your ${cashBalances[0].account_name} balance (${cashBalances[0].balance_date}) + income − expenses since that date.`
+                    : 'Estimated from total income minus total expenses in FINNMGR. Add a cash balance via Connect Bank for a real reading.' },
                 { key: 'burnRate',       label: 'Burn Rate',         value: d.avgExp,     prefix: '$', decimals: 0, color: '#f59e0b', icon: '🔥', sub: '3-month average', tip: 'Average money your business spends each month.' },
                 { key: 'collectionRate', label: 'Collection Rate',   value: d.collectionRate, prefix: '', suffix: '%', decimals: 1, color: d.collectionRate > 80 ? '#10b981' : '#f59e0b', icon: '📬', sub: `${fmt$(d.totalOutstanding)} outstanding`, tip: 'Percentage of invoiced money actually received.' },
               ].map((s, i) => (
@@ -965,15 +976,15 @@ export default function CashflowPage() {
                   <h2 style={{ fontWeight: 900, fontSize: 15, color: 'var(--ink)', letterSpacing: '-0.03em' }}>Upcoming Obligations</h2>
                   <InfoLearnIcon topic="obligations" onLearn={setLearnTopic} tip="Payments your business is expected to make soon." />
                 </div>
-                {d.subsObligations.length === 0 && d.taxDeadlines.length === 0 && d.invoiceObligations.length === 0 ? (
+                {d.subsObligations.length === 0 && d.invoiceObligations.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '28px 0', color: 'var(--mu)' }}>
                     <span style={{ fontSize: 28, display: 'block', marginBottom: 8 }}>📋</span>
                     <p style={{ fontSize: 12 }}>No upcoming obligations detected. Mark expenses as subscriptions to track them here.</p>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {[...d.subsObligations, ...d.invoiceObligations.filter(i => i.isOverdue), ...d.taxDeadlines].slice(0, 6).map((item, i) => {
-                      const daysLeft = 'daysUntil' in item ? (item as { daysUntil: number }).daysUntil : Math.round((item.date.getTime() - Date.now()) / 86400000)
+                    {[...d.subsObligations, ...d.invoiceObligations.filter(i => i.isOverdue)].slice(0, 6).map((item, i) => {
+                      const daysLeft = item.daysUntil
                       const isOverdue = daysLeft < 0
                       const urgColor = isOverdue ? '#ef4444' : daysLeft < 7 ? '#f59e0b' : '#10b981'
                       return (
@@ -990,6 +1001,13 @@ export default function CashflowPage() {
                     })}
                   </div>
                 )}
+                {/* Tax deadlines: not shown until Tax module is connected */}
+                <div style={{ marginTop: 12, padding: '9px 12px', borderRadius: 10, background: 'var(--bg3)', border: '1px solid var(--bd)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 14 }}>🧮</span>
+                  <p style={{ fontSize: 11, color: 'var(--mu)', lineHeight: 1.5 }}>
+                    <strong style={{ color: 'var(--ink)' }}>Tax deadlines</strong> — connect the Tax module to see quarterly payment dates here.
+                  </p>
+                </div>
               </motion.div>
 
               {/* Invoice Impact */}
